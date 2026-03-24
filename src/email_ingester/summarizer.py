@@ -78,17 +78,18 @@ def create_client(config: Config) -> openai.OpenAI:
 
 
 def _format_emails_for_llm(emails: list[Email]) -> str:
-    """Format all emails into a single text block for the LLM."""
+    """Format all emails into a condensed feed for the LLM.
+
+    Each email is trimmed to subject, sender, and first 300 chars of body
+    plus up to 5 links. This keeps the total prompt manageable even for
+    50+ emails.
+    """
     parts = []
     for i, email in enumerate(emails, 1):
-        links_str = "\n".join(email.links[:10]) if email.links else "(none)"
+        links_str = " | ".join(email.links[:5]) if email.links else "(none)"
+        body_preview = email.body_text[:300].replace("\n", " ").strip()
         parts.append(
-            f"--- EMAIL {i} ---\n"
-            f"Subject: {email.subject}\n"
-            f"From: {email.sender}\n"
-            f"Date: {email.timestamp.isoformat()}\n"
-            f"Body:\n{email.body_text[:2000]}\n"
-            f"Links:\n{links_str}"
+            f"[{i}] {email.subject}\nFrom: {email.sender}\n{body_preview}\nLinks: {links_str}"
         )
     return "\n\n".join(parts)
 
@@ -96,6 +97,7 @@ def _format_emails_for_llm(emails: list[Email]) -> str:
 def generate_report(config: Config, client: openai.OpenAI, emails: list[Email]) -> DigestReport:
     """Send all emails to the LLM in one call and get an aggregated report back."""
     user_content = _format_emails_for_llm(emails)
+    logger.info("LLM prompt size: %d chars for %d emails", len(user_content), len(emails))
 
     try:
         response = client.chat.completions.create(
@@ -111,10 +113,14 @@ def generate_report(config: Config, client: openai.OpenAI, emails: list[Email]) 
         return _fallback_report(reason="api_error")
 
     if not response.choices:
+        logger.error("LLM returned no choices")
         return _fallback_report(reason="empty_choices")
 
     raw = response.choices[0].message.content
+    logger.info("LLM response length: %d chars", len(raw) if raw else 0)
+
     if not raw or not raw.strip():
+        logger.error("LLM returned blank response")
         return _fallback_report(reason="blank_response")
 
     try:
