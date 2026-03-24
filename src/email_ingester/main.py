@@ -14,10 +14,9 @@ from email_ingester.config import Config
 from email_ingester.digest import generate_digest
 from email_ingester.ingester import fetch_new_emails
 from email_ingester.processor import process_email
-from email_ingester.scorer import score_and_rank
 from email_ingester.sender import send_digest
 from email_ingester.state import load_state, save_state
-from email_ingester.summarizer import create_client, summarize_batch
+from email_ingester.summarizer import create_client, generate_report
 
 logging.basicConfig(
     level=logging.INFO,
@@ -50,7 +49,7 @@ def main() -> None:
     logger.info("Fetched %d new emails", len(raw_emails))
 
     if not raw_emails:
-        logger.info("No new emails — skipping digest generation")
+        logger.info("No new emails, skipping digest generation")
         save_state(state_path, new_state)
         return
 
@@ -58,34 +57,23 @@ def main() -> None:
     logger.info("Processing emails")
     processed_emails = [process_email(e) for e in raw_emails]
 
-    # 6. Summarize via LLM
-    logger.info("Summarizing %d emails via LLM", len(processed_emails))
+    # 6. Generate aggregated report via LLM
+    logger.info("Generating report from %d emails via LLM", len(processed_emails))
     client = create_client(config)
-    summarized = summarize_batch(config, client, processed_emails)
+    report = generate_report(config, client, processed_emails)
 
-    # 7. Score and rank
-    logger.info("Scoring and ranking")
-    ranked = score_and_rank(summarized)
+    # 7. Render digest HTML
+    logger.info("Rendering digest")
+    digest = generate_digest(report, total_processed=len(processed_emails))
 
-    # 8. Generate digest
-    logger.info("Generating digest")
-    digest = generate_digest(ranked)
-    logger.info(
-        "Digest: %d breaking, %d stacks, %d software, %d dives",
-        len(digest.breaking_news),
-        len(digest.tech_stacks),
-        len(digest.new_software),
-        len(digest.deep_dives),
-    )
-
-    # 9. Send digest — failure should not prevent state save
+    # 8. Send digest
     try:
         logger.info("Sending digest to %s", config.digest_recipient)
         send_digest(config, token, digest)
     except Exception:
-        logger.exception("Failed to send digest — state will still be saved")
+        logger.exception("Failed to send digest, state will still be saved")
 
-    # 10. Save state (always, even on send failure)
+    # 9. Save state (always, even on send failure)
     save_state(state_path, new_state)
 
     logger.info("Pipeline complete")

@@ -28,9 +28,12 @@ def _make_config() -> Config:
 
 
 def _make_digest() -> DigestOutput:
+    from email_ingester.models import DigestReport
+
     return DigestOutput(
         generated_at=datetime(2026, 3, 23, 10, 0, tzinfo=UTC),
         total_processed=1,
+        report=DigestReport(breaking_news="Test", tech_stacks="", new_software="", deep_dives=""),
         html="<html><body>Digest content</body></html>",
     )
 

@@ -1,7 +1,7 @@
-"""LLM-based email summarization via OpenRouter (OpenAI-compatible API).
+"""Aggregate email summarization via OpenRouter (OpenAI-compatible API).
 
-Data flow: Email → summarize_email() → EmailSummary
-The scorer then combines EmailSummary + Email → ProcessedEmail.
+Data flow: list[Email] -> generate_report() -> DigestReport
+Single LLM call that reads all emails and produces one aggregated brief.
 """
 
 from __future__ import annotations
@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 
 import openai
 
-from email_ingester.models import Email, EmailSummary  # noqa: TC001
+from email_ingester.models import DigestReport, Email, Footnote  # noqa: TC001
 
 if TYPE_CHECKING:
     from email_ingester.config import Config
@@ -21,36 +21,51 @@ logger = logging.getLogger(__name__)
 
 _OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
-_VALID_TOPICS = frozenset({"breaking_news", "tech_stacks", "new_software", "deep_dives"})
-
 _SYSTEM_PROMPT = """\
-You are an email analysis assistant. Given an email, produce a structured JSON summary.
+You are an intelligence analyst for Guava AI, a software company. You produce \
+a concise daily brief from a batch of newsletter emails. Your reader is a \
+technical leader who needs to stay current on backend, frontend, design, dev \
+tooling, B2B software, and AI/ML.
+
+Read all the emails below and produce ONE aggregated JSON report. Do not \
+summarize each email individually. Synthesize and group the information.
 
 Respond with ONLY valid JSON in this exact format:
 {
-  "summary": "One-line summary, max 75 characters",
-  "topic": "breaking_news|tech_stacks|new_software|deep_dives",
-  "key_links": ["most useful URLs from the email, max 3"]
+  "breaking_news": "2-3 sentences on urgent developments, outages, security \
+alerts, or major announcements. If nothing qualifies, write 'No breaking news \
+this cycle.'",
+  "tech_stacks": "2-3 sentences on backend, frontend, infrastructure, \
+architecture, or framework trends worth noting.",
+  "new_software": "2-3 sentences on new tools, product launches, version \
+releases, or dev tooling updates relevant to building software.",
+  "deep_dives": "2-3 sentences on notable long-form content, tutorials, or \
+analyses worth reading later.",
+  "footnotes": [
+    {"title": "Short article title", "url": "https://..."},
+    {"title": "Short article title", "url": "https://..."}
+  ]
 }
 
-Topic guidelines:
-- breaking_news: urgent updates, security alerts, outages, major announcements
-- tech_stacks: frameworks, languages, infrastructure, architecture trends
-- new_software: tools, apps, product launches, version releases
-- deep_dives: tutorials, in-depth articles, analyses, long-form content
-
-Keep the summary punchy — one sentence, max 75 characters. No filler words.
+Rules:
+- Total report must be under 1500 characters (excluding footnotes).
+- Use business imperative tone. Be direct. No filler.
+- Never use em dashes.
+- Aggregate related news into single statements.
+- Footnotes: include the 5-10 most important article links. Use short titles.
+- If a section has nothing noteworthy, say so in one sentence.
 """
 
 
-def _fallback_summary(email_id: str, reason: str) -> EmailSummary:
-    """Return a safe fallback EmailSummary when LLM processing fails."""
-    return EmailSummary(
-        email_id=email_id,
-        summary="(summarization failed)",
-        topic="deep_dives",
-        key_links=[],
-        model_confidence=0.0,
+def _fallback_report(reason: str) -> DigestReport:
+    """Return a safe fallback report when the LLM call fails."""
+    logger.warning("Using fallback report: %s", reason)
+    return DigestReport(
+        breaking_news="Report generation failed. Check logs for details.",
+        tech_stacks="",
+        new_software="",
+        deep_dives="",
+        footnotes=[],
     )
 
 
@@ -62,101 +77,61 @@ def create_client(config: Config) -> openai.OpenAI:
     )
 
 
-def summarize_email(config: Config, client: openai.OpenAI, email: Email) -> EmailSummary:
-    """Summarize a single email using the LLM via OpenRouter.
+def _format_emails_for_llm(emails: list[Email]) -> str:
+    """Format all emails into a single text block for the LLM."""
+    parts = []
+    for i, email in enumerate(emails, 1):
+        links_str = "\n".join(email.links[:10]) if email.links else "(none)"
+        parts.append(
+            f"--- EMAIL {i} ---\n"
+            f"Subject: {email.subject}\n"
+            f"From: {email.sender}\n"
+            f"Date: {email.timestamp.isoformat()}\n"
+            f"Body:\n{email.body_text[:2000]}\n"
+            f"Links:\n{links_str}"
+        )
+    return "\n\n".join(parts)
 
-    Returns an EmailSummary (intermediate type). The scorer combines this
-    with the original Email to produce a final ProcessedEmail.
 
-    On LLM API errors or JSON parse failures, logs the error and returns a
-    fallback EmailSummary with topic="deep_dives".
-    """
-    user_content = f"""Subject: {email.subject}
-From: {email.sender}
-Date: {email.timestamp.isoformat()}
-
-Body:
-{email.body_text[:3000]}
-
-Links found:
-{chr(10).join(email.links[:20]) if email.links else "(none)"}"""
+def generate_report(config: Config, client: openai.OpenAI, emails: list[Email]) -> DigestReport:
+    """Send all emails to the LLM in one call and get an aggregated report back."""
+    user_content = _format_emails_for_llm(emails)
 
     try:
         response = client.chat.completions.create(
             model=config.llm_model,
-            max_tokens=256,
+            max_tokens=1024,
             messages=[
                 {"role": "system", "content": _SYSTEM_PROMPT},
                 {"role": "user", "content": user_content},
             ],
         )
     except openai.APIError as exc:
-        logger.error(
-            "OpenRouter API error while summarizing email %s: %s",
-            email.id,
-            exc,
-        )
-        return _fallback_summary(email.id, reason="api_error")
+        logger.error("OpenRouter API error generating report: %s", exc)
+        return _fallback_report(reason="api_error")
 
     if not response.choices:
-        logger.warning(
-            "Empty choices in LLM response for email %s; using fallback summary.",
-            email.id,
-        )
-        return _fallback_summary(email.id, reason="empty_content")
+        return _fallback_report(reason="empty_choices")
 
     raw = response.choices[0].message.content
-
     if not raw or not raw.strip():
-        logger.warning(
-            "Blank text in LLM response for email %s; using fallback summary.",
-            email.id,
-        )
-        return _fallback_summary(email.id, reason="blank_text")
+        return _fallback_report(reason="blank_response")
 
     try:
         data = json.loads(raw)
     except json.JSONDecodeError as exc:
-        logger.warning(
-            "JSON parse error for email %s: %s — raw response: %.200s",
-            email.id,
-            exc,
-            raw,
-        )
-        return _fallback_summary(email.id, reason="json_parse_error")
+        logger.warning("JSON parse error: %s -- raw: %.300s", exc, raw)
+        return _fallback_report(reason="json_parse_error")
 
-    topic = data.get("topic", "deep_dives")
-    if topic not in _VALID_TOPICS:
-        logger.warning("Unknown topic %r for email %s, defaulting to deep_dives", topic, email.id)
-        topic = "deep_dives"
+    footnotes = []
+    for fn in data.get("footnotes", []):
+        if isinstance(fn, dict) and fn.get("title") and fn.get("url"):
+            footnotes.append(Footnote(title=fn["title"], url=fn["url"]))
 
-    return EmailSummary(
-        email_id=email.id,
-        summary=data.get("summary", "")[:75],
-        topic=topic,
-        key_links=data.get("key_links", []),
-        model_confidence=0.5,
+    return DigestReport(
+        breaking_news=data.get("breaking_news", ""),
+        tech_stacks=data.get("tech_stacks", ""),
+        new_software=data.get("new_software", ""),
+        deep_dives=data.get("deep_dives", ""),
+        footnotes=footnotes,
     )
-
-
-def summarize_batch(
-    config: Config, client: openai.OpenAI, emails: list[Email]
-) -> list[tuple[Email, EmailSummary]]:
-    """Summarize a batch of emails sequentially.
-
-    Returns (Email, EmailSummary) pairs so the scorer has both available.
-    A failure on a single email is logged and skipped — the batch continues.
-    """
-    results: list[tuple[Email, EmailSummary]] = []
-    for email in emails:
-        try:
-            summary = summarize_email(config, client, email)
-        except Exception as exc:  # noqa: BLE001
-            logger.error(
-                "Unexpected error summarizing email %s; skipping. Error: %s",
-                email.id,
-                exc,
-            )
-            summary = _fallback_summary(email.id, reason="unexpected_error")
-        results.append((email, summary))
-    return results

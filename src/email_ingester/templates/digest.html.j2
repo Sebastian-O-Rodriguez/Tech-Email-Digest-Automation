@@ -4,129 +4,75 @@
 <meta charset="utf-8">
 <style>
   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; margin: 0; padding: 20px; background: #f5f5f5; color: #1a1a1a; }
-  .container { max-width: 640px; margin: 0 auto; background: #fff; border-radius: 8px; overflow: hidden; }
+  .container { max-width: 600px; margin: 0 auto; background: #fff; border-radius: 8px; overflow: hidden; }
   .header { background: #1a1a2e; color: #e0e0e0; padding: 20px 24px; }
-  .header h1 { margin: 0 0 4px 0; font-size: 20px; font-weight: 600; }
-  .header .meta { font-size: 13px; color: #999; }
-  .section { padding: 16px 24px; }
-  .section-title { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin: 0 0 10px 0; padding-bottom: 6px; border-bottom: 2px solid; }
-  .breaking .section-title { color: #c0392b; border-color: #c0392b; }
-  .stacks .section-title { color: #2980b9; border-color: #2980b9; }
-  .software .section-title { color: #27ae60; border-color: #27ae60; }
-  .dives .section-title { color: #8e44ad; border-color: #8e44ad; }
-  .item { margin-bottom: 12px; padding: 10px 12px; background: #fafafa; border-radius: 6px; border-left: 3px solid #ddd; }
-  .breaking .item { border-left-color: #c0392b; }
-  .stacks .item { border-left-color: #2980b9; }
-  .software .item { border-left-color: #27ae60; }
-  .dives .item { border-left-color: #8e44ad; }
-  .item-subject { font-size: 14px; font-weight: 600; margin: 0 0 2px 0; }
-  .item-sender { font-size: 11px; color: #999; margin: 0 0 4px 0; }
-  .item-summary { font-size: 13px; line-height: 1.4; margin: 0 0 6px 0; color: #333; }
-  .item-buttons { margin: 0; padding: 0; }
-  .btn { display: inline-block; padding: 4px 12px; margin: 2px 4px 2px 0; font-size: 12px; font-weight: 500; color: #fff; background: #2980b9; border-radius: 4px; text-decoration: none; }
-  .breaking .btn { background: #c0392b; }
-  .stacks .btn { background: #2980b9; }
-  .software .btn { background: #27ae60; }
-  .dives .btn { background: #8e44ad; }
-  .btn:hover { opacity: 0.85; }
-  .footer { padding: 16px 24px; text-align: center; font-size: 12px; color: #aaa; border-top: 1px solid #eee; }
-  .empty { padding: 12px 24px; font-size: 13px; color: #888; text-align: center; }
+  .header h1 { margin: 0 0 4px 0; font-size: 18px; font-weight: 600; }
+  .header .meta { font-size: 12px; color: #999; }
+  .section { padding: 12px 24px 4px 24px; }
+  .section-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; margin: 0 0 6px 0; padding-bottom: 4px; border-bottom: 2px solid; }
+  .breaking .section-label { color: #c0392b; border-color: #c0392b; }
+  .stacks .section-label { color: #2980b9; border-color: #2980b9; }
+  .software .section-label { color: #27ae60; border-color: #27ae60; }
+  .dives .section-label { color: #8e44ad; border-color: #8e44ad; }
+  .section-body { font-size: 13px; line-height: 1.5; color: #333; margin: 0 0 8px 0; }
+  .footnotes { padding: 12px 24px; border-top: 1px solid #eee; }
+  .footnotes-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: #666; margin: 0 0 8px 0; }
+  .footnotes ol { margin: 0; padding: 0 0 0 20px; }
+  .footnotes li { font-size: 12px; line-height: 1.6; color: #555; }
+  .footnotes a { color: #2980b9; text-decoration: none; }
+  .footnotes a:hover { text-decoration: underline; }
+  .footer { padding: 12px 24px; text-align: center; font-size: 11px; color: #bbb; border-top: 1px solid #eee; }
 </style>
 </head>
 <body>
 <div class="container">
 
   <div class="header">
-    <h1>Email Digest</h1>
-    <div class="meta">{{ digest.generated_at.strftime('%B %d, %Y at %I:%M %p UTC') }} &middot; {{ digest.total_processed }} email{{ 's' if digest.total_processed != 1 else '' }}</div>
+    <h1>Guava AI Daily Brief</h1>
+    <div class="meta">{{ digest.generated_at.strftime('%B %d, %Y at %I:%M %p UTC') }} | {{ digest.total_processed }} source{{ 's' if digest.total_processed != 1 else '' }} analyzed</div>
   </div>
 
-  {% if digest.breaking_news %}
+  {% if digest.report.breaking_news %}
   <div class="section breaking">
-    <h2 class="section-title">Breaking News ({{ digest.breaking_news | length }})</h2>
-    {% for item in digest.breaking_news %}
-    <div class="item">
-      <p class="item-subject">{{ item.email.subject | truncate(60) }}</p>
-      <p class="item-sender">{{ item.email.sender }}</p>
-      <p class="item-summary">{{ item.summary }}</p>
-      {% if item.key_links %}
-      <div class="item-buttons">
-        {% for link in item.key_links %}
-        <a class="btn" href="{{ link }}">Read &rarr;</a>
-        {% endfor %}
-      </div>
-      {% endif %}
-    </div>
-    {% endfor %}
+    <p class="section-label">Breaking News</p>
+    <p class="section-body">{{ digest.report.breaking_news }}</p>
   </div>
   {% endif %}
 
-  {% if digest.tech_stacks %}
+  {% if digest.report.tech_stacks %}
   <div class="section stacks">
-    <h2 class="section-title">Tech Stacks ({{ digest.tech_stacks | length }})</h2>
-    {% for item in digest.tech_stacks %}
-    <div class="item">
-      <p class="item-subject">{{ item.email.subject | truncate(60) }}</p>
-      <p class="item-sender">{{ item.email.sender }}</p>
-      <p class="item-summary">{{ item.summary }}</p>
-      {% if item.key_links %}
-      <div class="item-buttons">
-        {% for link in item.key_links %}
-        <a class="btn" href="{{ link }}">Read &rarr;</a>
-        {% endfor %}
-      </div>
-      {% endif %}
-    </div>
-    {% endfor %}
+    <p class="section-label">Tech Stacks</p>
+    <p class="section-body">{{ digest.report.tech_stacks }}</p>
   </div>
   {% endif %}
 
-  {% if digest.new_software %}
+  {% if digest.report.new_software %}
   <div class="section software">
-    <h2 class="section-title">New Software ({{ digest.new_software | length }})</h2>
-    {% for item in digest.new_software %}
-    <div class="item">
-      <p class="item-subject">{{ item.email.subject | truncate(60) }}</p>
-      <p class="item-sender">{{ item.email.sender }}</p>
-      <p class="item-summary">{{ item.summary }}</p>
-      {% if item.key_links %}
-      <div class="item-buttons">
-        {% for link in item.key_links %}
-        <a class="btn" href="{{ link }}">Read &rarr;</a>
-        {% endfor %}
-      </div>
-      {% endif %}
-    </div>
-    {% endfor %}
+    <p class="section-label">New Software</p>
+    <p class="section-body">{{ digest.report.new_software }}</p>
   </div>
   {% endif %}
 
-  {% if digest.deep_dives %}
+  {% if digest.report.deep_dives %}
   <div class="section dives">
-    <h2 class="section-title">Deep Dives ({{ digest.deep_dives | length }})</h2>
-    {% for item in digest.deep_dives %}
-    <div class="item">
-      <p class="item-subject">{{ item.email.subject | truncate(60) }}</p>
-      <p class="item-sender">{{ item.email.sender }}</p>
-      <p class="item-summary">{{ item.summary }}</p>
-      {% if item.key_links %}
-      <div class="item-buttons">
-        {% for link in item.key_links %}
-        <a class="btn" href="{{ link }}">Read &rarr;</a>
-        {% endfor %}
-      </div>
-      {% endif %}
-    </div>
-    {% endfor %}
+    <p class="section-label">Deep Dives</p>
+    <p class="section-body">{{ digest.report.deep_dives }}</p>
   </div>
   {% endif %}
 
-  {% if not digest.breaking_news and not digest.tech_stacks and not digest.new_software and not digest.deep_dives %}
-  <div class="empty">No emails to report.</div>
+  {% if digest.report.footnotes %}
+  <div class="footnotes">
+    <p class="footnotes-label">Key Articles</p>
+    <ol>
+      {% for fn in digest.report.footnotes %}
+      <li><a href="{{ fn.url }}">{{ fn.title }}</a></li>
+      {% endfor %}
+    </ol>
+  </div>
   {% endif %}
 
   <div class="footer">
-    Generated by Email Ingester
+    Guava AI Intelligence Brief
   </div>
 
 </div>

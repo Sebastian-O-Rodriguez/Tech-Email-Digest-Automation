@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 
 import pytest
 
-from email_ingester.models import Email, ProcessedEmail
+from email_ingester.models import Email
 
 
 @pytest.fixture
@@ -20,17 +20,4 @@ def sample_email() -> Email:
             '<a href="https://example.com/article">Read more</a>'
         ),
         links=["https://example.com/article"],
-    )
-
-
-@pytest.fixture
-def sample_processed(sample_email: Email) -> ProcessedEmail:
-    return ProcessedEmail(
-        email=sample_email,
-        summary="Weekly roundup covering reasoning model advances.",
-        priority="high",
-        why_it_matters="Relevant to current AI development work.",
-        recommended_action="Read the linked article.",
-        key_links=["https://example.com/article"],
-        score=0.0,
     )

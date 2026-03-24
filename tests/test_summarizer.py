@@ -1,4 +1,4 @@
-"""Tests for LLM summarizer error handling."""
+"""Tests for aggregated report generation."""
 
 import json
 from datetime import UTC, datetime
@@ -8,8 +8,8 @@ import openai
 import pytest
 
 from email_ingester.config import Config
-from email_ingester.models import Email, EmailSummary
-from email_ingester.summarizer import summarize_batch, summarize_email
+from email_ingester.models import DigestReport, Email
+from email_ingester.summarizer import generate_report
 
 
 @pytest.fixture
@@ -28,20 +28,30 @@ def config() -> Config:
 
 
 @pytest.fixture
-def sample_email() -> Email:
-    return Email(
-        id="email-001",
-        subject="Interesting Article",
-        sender="news@example.com",
-        timestamp=datetime(2026, 3, 23, 10, 0, tzinfo=UTC),
-        body_text="A great article about software engineering.",
-        body_html="<p>A great article about software engineering.</p>",
-        links=["https://example.com/article"],
-    )
+def sample_emails() -> list[Email]:
+    return [
+        Email(
+            id="email-001",
+            subject="Breaking: Major outage",
+            sender="alerts@example.com",
+            timestamp=datetime(2026, 3, 23, 10, 0, tzinfo=UTC),
+            body_text="A major outage hit AWS us-east-1.",
+            body_html="",
+            links=["https://example.com/outage"],
+        ),
+        Email(
+            id="email-002",
+            subject="New React 20 features",
+            sender="news@example.com",
+            timestamp=datetime(2026, 3, 23, 11, 0, tzinfo=UTC),
+            body_text="React 20 ships with server components by default.",
+            body_html="",
+            links=["https://example.com/react20"],
+        ),
+    ]
 
 
 def _make_mock_response(text: str) -> MagicMock:
-    """Build a mock OpenAI chat completion response."""
     message = MagicMock()
     message.content = text
     choice = MagicMock()
@@ -51,45 +61,36 @@ def _make_mock_response(text: str) -> MagicMock:
     return response
 
 
-def _valid_llm_json() -> str:
+def _valid_report_json() -> str:
     return json.dumps(
         {
-            "summary": "A useful article on engineering.",
-            "topic": "deep_dives",
-            "key_links": ["https://example.com/article"],
+            "breaking_news": "AWS us-east-1 experienced a major outage.",
+            "tech_stacks": "React 20 ships server components by default.",
+            "new_software": "No notable releases this cycle.",
+            "deep_dives": "No deep dives worth flagging.",
+            "footnotes": [
+                {"title": "AWS outage details", "url": "https://example.com/outage"},
+                {"title": "React 20 announcement", "url": "https://example.com/react20"},
+            ],
         }
     )
 
 
-class TestSummarizeEmail:
-    def test_successful_summarization_returns_email_summary(
-        self, config: Config, sample_email: Email
-    ):
+class TestGenerateReport:
+    def test_successful_report(self, config: Config, sample_emails: list[Email]):
         client = MagicMock(spec=openai.OpenAI)
-        client.chat.completions.create.return_value = _make_mock_response(_valid_llm_json())
+        client.chat.completions.create.return_value = _make_mock_response(_valid_report_json())
 
-        result = summarize_email(config, client, sample_email)
+        result = generate_report(config, client, sample_emails)
 
-        assert isinstance(result, EmailSummary)
-        assert result.email_id == sample_email.id
-        assert result.summary == "A useful article on engineering."
-        assert result.topic == "deep_dives"
-        assert result.key_links == ["https://example.com/article"]
-        assert result.model_confidence == 0.5
+        assert isinstance(result, DigestReport)
+        assert "outage" in result.breaking_news.lower()
+        assert "react" in result.tech_stacks.lower()
+        assert len(result.footnotes) == 2
+        assert result.footnotes[0].title == "AWS outage details"
+        assert result.footnotes[0].url == "https://example.com/outage"
 
-    def test_json_parse_error_returns_fallback(self, config: Config, sample_email: Email):
-        client = MagicMock(spec=openai.OpenAI)
-        client.chat.completions.create.return_value = _make_mock_response("not valid json {{")
-
-        result = summarize_email(config, client, sample_email)
-
-        assert isinstance(result, EmailSummary)
-        assert result.email_id == sample_email.id
-        assert result.summary == "(summarization failed)"
-        assert result.topic == "deep_dives"
-        assert result.model_confidence == 0.0
-
-    def test_api_error_returns_fallback(self, config: Config, sample_email: Email):
+    def test_api_error_returns_fallback(self, config: Config, sample_emails: list[Email]):
         client = MagicMock(spec=openai.OpenAI)
         client.chat.completions.create.side_effect = openai.APIStatusError(
             message="Internal Server Error",
@@ -97,113 +98,52 @@ class TestSummarizeEmail:
             body={},
         )
 
-        result = summarize_email(config, client, sample_email)
+        result = generate_report(config, client, sample_emails)
 
-        assert isinstance(result, EmailSummary)
-        assert result.summary == "(summarization failed)"
-        assert result.topic == "deep_dives"
-        assert result.model_confidence == 0.0
+        assert isinstance(result, DigestReport)
+        assert "failed" in result.breaking_news.lower()
 
-    def test_empty_choices_in_response_returns_fallback(self, config: Config, sample_email: Email):
+    def test_json_parse_error_returns_fallback(self, config: Config, sample_emails: list[Email]):
+        client = MagicMock(spec=openai.OpenAI)
+        client.chat.completions.create.return_value = _make_mock_response("not json {{")
+
+        result = generate_report(config, client, sample_emails)
+        assert "failed" in result.breaking_news.lower()
+
+    def test_empty_choices_returns_fallback(self, config: Config, sample_emails: list[Email]):
         client = MagicMock(spec=openai.OpenAI)
         response = MagicMock()
         response.choices = []
         client.chat.completions.create.return_value = response
 
-        result = summarize_email(config, client, sample_email)
+        result = generate_report(config, client, sample_emails)
+        assert "failed" in result.breaking_news.lower()
 
-        assert result.summary == "(summarization failed)"
-        assert result.topic == "deep_dives"
-        assert result.model_confidence == 0.0
-
-    def test_blank_text_in_response_returns_fallback(self, config: Config, sample_email: Email):
+    def test_blank_response_returns_fallback(self, config: Config, sample_emails: list[Email]):
         client = MagicMock(spec=openai.OpenAI)
         client.chat.completions.create.return_value = _make_mock_response("   ")
 
-        result = summarize_email(config, client, sample_email)
+        result = generate_report(config, client, sample_emails)
+        assert "failed" in result.breaking_news.lower()
 
-        assert result.summary == "(summarization failed)"
-        assert result.topic == "deep_dives"
-        assert result.model_confidence == 0.0
-
-    def test_unknown_topic_defaults_to_deep_dives(self, config: Config, sample_email: Email):
+    def test_malformed_footnotes_skipped(self, config: Config, sample_emails: list[Email]):
         client = MagicMock(spec=openai.OpenAI)
-        bad_topic_json = json.dumps({"summary": "Test", "topic": "garbage", "key_links": []})
-        client.chat.completions.create.return_value = _make_mock_response(bad_topic_json)
-
-        result = summarize_email(config, client, sample_email)
-        assert result.topic == "deep_dives"
-
-    def test_summary_truncated_to_75_chars(self, config: Config, sample_email: Email):
-        client = MagicMock(spec=openai.OpenAI)
-        long_summary = "A" * 100
-        long_json = json.dumps({"summary": long_summary, "topic": "breaking_news", "key_links": []})
-        client.chat.completions.create.return_value = _make_mock_response(long_json)
-
-        result = summarize_email(config, client, sample_email)
-        assert len(result.summary) <= 75
-
-
-class TestSummarizeBatch:
-    def test_continues_after_single_email_failure(self, config: Config):
-        email_a = Email(
-            id="a",
-            subject="Good Email",
-            sender="a@example.com",
-            timestamp=datetime(2026, 3, 23, tzinfo=UTC),
-            body_text="Content A",
-            body_html="",
-            links=[],
+        data = json.dumps(
+            {
+                "breaking_news": "Test",
+                "tech_stacks": "Test",
+                "new_software": "Test",
+                "deep_dives": "Test",
+                "footnotes": [
+                    {"title": "Good", "url": "https://example.com"},
+                    {"title": "", "url": ""},
+                    "not a dict",
+                    {"title": "No URL"},
+                ],
+            }
         )
-        email_b = Email(
-            id="b",
-            subject="Failing Email",
-            sender="b@example.com",
-            timestamp=datetime(2026, 3, 23, tzinfo=UTC),
-            body_text="Content B",
-            body_html="",
-            links=[],
-        )
+        client.chat.completions.create.return_value = _make_mock_response(data)
 
-        client = MagicMock(spec=openai.OpenAI)
-
-        def side_effect(*, model, max_tokens, messages):
-            user_msg = messages[1]["content"]
-            if "Subject: Good Email" in user_msg:
-                return _make_mock_response(_valid_llm_json())
-            raise openai.APIStatusError(
-                message="Service Unavailable",
-                response=MagicMock(status_code=503),
-                body={},
-            )
-
-        client.chat.completions.create.side_effect = side_effect
-
-        results = summarize_batch(config, client, [email_a, email_b])
-
-        assert len(results) == 2
-
-        email_result_a, summary_a = results[0]
-        assert email_result_a.id == "a"
-        assert summary_a.summary != "(summarization failed)"
-
-        email_result_b, summary_b = results[1]
-        assert email_result_b.id == "b"
-        assert summary_b.summary == "(summarization failed)"
-        assert summary_b.model_confidence == 0.0
-
-    def test_returns_email_summary_pairs(self, config: Config, sample_email: Email):
-        client = MagicMock(spec=openai.OpenAI)
-        client.chat.completions.create.return_value = _make_mock_response(_valid_llm_json())
-
-        results = summarize_batch(config, client, [sample_email])
-
-        assert len(results) == 1
-        email, summary = results[0]
-        assert email is sample_email
-        assert isinstance(summary, EmailSummary)
-
-    def test_empty_batch_returns_empty_list(self, config: Config):
-        client = MagicMock(spec=openai.OpenAI)
-        results = summarize_batch(config, client, [])
-        assert results == []
+        result = generate_report(config, client, sample_emails)
+        assert len(result.footnotes) == 1
+        assert result.footnotes[0].title == "Good"

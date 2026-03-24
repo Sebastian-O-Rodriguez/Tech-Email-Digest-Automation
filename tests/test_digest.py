@@ -1,63 +1,51 @@
 """Tests for digest generation."""
 
-from datetime import UTC, datetime
-
 from email_ingester.digest import generate_digest
-from email_ingester.models import Email, ProcessedEmail
+from email_ingester.models import DigestReport, Footnote
 
 
-def _make_item(topic: str, subject: str = "Test Subject") -> ProcessedEmail:
-    email = Email(
-        id=f"msg-{topic}",
-        subject=subject,
-        sender="sender@example.com",
-        timestamp=datetime(2026, 3, 23, 10, 0, tzinfo=UTC),
-        body_text="Body text here.",
-        body_html="<p>Body text here.</p>",
-        links=["https://example.com"],
-    )
-    return ProcessedEmail(
-        email=email,
-        summary=f"Summary for {topic} item.",
-        topic=topic,
-        key_links=["https://example.com"],
-        score=0.5,
+def _make_report() -> DigestReport:
+    return DigestReport(
+        breaking_news="Major outage on AWS.",
+        tech_stacks="React 20 ships server components.",
+        new_software="Cursor launched v2.",
+        deep_dives="Great article on system design.",
+        footnotes=[
+            Footnote(title="AWS outage", url="https://example.com/outage"),
+        ],
     )
 
 
 class TestGenerateDigest:
-    def test_groups_by_topic(self):
-        items = [
-            _make_item("breaking_news"),
-            _make_item("tech_stacks"),
-            _make_item("new_software"),
-            _make_item("deep_dives"),
-        ]
-        digest = generate_digest(items)
-        assert len(digest.breaking_news) == 1
-        assert len(digest.tech_stacks) == 1
-        assert len(digest.new_software) == 1
-        assert len(digest.deep_dives) == 1
-        assert digest.total_processed == 4
-
-    def test_generates_html(self):
-        items = [_make_item("breaking_news")]
-        digest = generate_digest(items)
-        assert "Email Digest" in digest.html
-        assert "Test Subject" in digest.html
+    def test_generates_html_with_sections(self):
+        report = _make_report()
+        digest = generate_digest(report, total_processed=5)
+        assert "Guava AI" in digest.html
         assert "Breaking News" in digest.html
+        assert "Tech Stacks" in digest.html
+        assert "New Software" in digest.html
+        assert "Deep Dives" in digest.html
+        assert digest.total_processed == 5
 
-    def test_empty_input(self):
-        digest = generate_digest([])
+    def test_html_contains_footnotes(self):
+        report = _make_report()
+        digest = generate_digest(report, total_processed=3)
+        assert "AWS outage" in digest.html
+        assert "https://example.com/outage" in digest.html
+
+    def test_empty_report(self):
+        report = DigestReport(
+            breaking_news="",
+            tech_stacks="",
+            new_software="",
+            deep_dives="",
+        )
+        digest = generate_digest(report, total_processed=0)
         assert digest.total_processed == 0
-        assert digest.breaking_news == []
-        assert digest.tech_stacks == []
-        assert digest.new_software == []
-        assert digest.deep_dives == []
-        assert "Email Digest" in digest.html
+        assert "Guava AI" in digest.html
 
-    def test_html_contains_link_buttons(self):
-        items = [_make_item("tech_stacks")]
-        digest = generate_digest(items)
-        assert 'class="btn"' in digest.html
-        assert "https://example.com" in digest.html
+    def test_report_data_preserved(self):
+        report = _make_report()
+        digest = generate_digest(report, total_processed=10)
+        assert digest.report is report
+        assert digest.report.breaking_news == "Major outage on AWS."
