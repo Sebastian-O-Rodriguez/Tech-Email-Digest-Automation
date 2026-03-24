@@ -20,7 +20,7 @@ def _make_config() -> Config:
         azure_client_secret="client-secret",
         mailbox_user_id="user@example.com",
         mailbox_folder="Inbox",
-        anthropic_api_key="sk-test",
+        openrouter_api_key="sk-test",
         llm_model="claude-sonnet-4-6-20250514",
         digest_recipient="recipient@example.com",
         state_file="state.json",

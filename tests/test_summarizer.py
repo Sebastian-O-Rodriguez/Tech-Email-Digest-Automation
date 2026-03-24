@@ -4,7 +4,7 @@ import json
 from datetime import UTC, datetime
 from unittest.mock import MagicMock
 
-import anthropic
+import openai
 import pytest
 
 from email_ingester.config import Config
@@ -20,8 +20,8 @@ def config() -> Config:
         azure_client_secret="secret",
         mailbox_user_id="user@example.com",
         mailbox_folder="Inbox",
-        anthropic_api_key="test-key",
-        llm_model="claude-test-model",
+        openrouter_api_key="test-key",
+        llm_model="anthropic/claude-sonnet-4",
         digest_recipient="user@example.com",
         state_file="state.json",
     )
@@ -40,13 +40,15 @@ def sample_email() -> Email:
     )
 
 
-def _make_mock_message(text: str) -> MagicMock:
-    """Build a mock anthropic message with a single text content block."""
-    block = MagicMock()
-    block.text = text
+def _make_mock_response(text: str) -> MagicMock:
+    """Build a mock OpenAI chat completion response."""
     message = MagicMock()
-    message.content = [block]
-    return message
+    message.content = text
+    choice = MagicMock()
+    choice.message = message
+    response = MagicMock()
+    response.choices = [choice]
+    return response
 
 
 def _valid_llm_json() -> str:
@@ -65,8 +67,8 @@ class TestSummarizeEmail:
     def test_successful_summarization_returns_email_summary(
         self, config: Config, sample_email: Email
     ):
-        client = MagicMock(spec=anthropic.Anthropic)
-        client.messages.create.return_value = _make_mock_message(_valid_llm_json())
+        client = MagicMock(spec=openai.OpenAI)
+        client.chat.completions.create.return_value = _make_mock_response(_valid_llm_json())
 
         result = summarize_email(config, client, sample_email)
 
@@ -80,8 +82,8 @@ class TestSummarizeEmail:
         assert result.model_confidence == 0.5
 
     def test_json_parse_error_returns_fallback(self, config: Config, sample_email: Email):
-        client = MagicMock(spec=anthropic.Anthropic)
-        client.messages.create.return_value = _make_mock_message("not valid json {{")
+        client = MagicMock(spec=openai.OpenAI)
+        client.chat.completions.create.return_value = _make_mock_response("not valid json {{")
 
         result = summarize_email(config, client, sample_email)
 
@@ -92,8 +94,8 @@ class TestSummarizeEmail:
         assert result.model_confidence == 0.0
 
     def test_api_error_returns_fallback(self, config: Config, sample_email: Email):
-        client = MagicMock(spec=anthropic.Anthropic)
-        client.messages.create.side_effect = anthropic.APIStatusError(
+        client = MagicMock(spec=openai.OpenAI)
+        client.chat.completions.create.side_effect = openai.APIStatusError(
             message="Internal Server Error",
             response=MagicMock(status_code=500),
             body={},
@@ -106,11 +108,11 @@ class TestSummarizeEmail:
         assert result.priority == "low"
         assert result.model_confidence == 0.0
 
-    def test_empty_content_in_response_returns_fallback(self, config: Config, sample_email: Email):
-        client = MagicMock(spec=anthropic.Anthropic)
-        message = MagicMock()
-        message.content = []
-        client.messages.create.return_value = message
+    def test_empty_choices_in_response_returns_fallback(self, config: Config, sample_email: Email):
+        client = MagicMock(spec=openai.OpenAI)
+        response = MagicMock()
+        response.choices = []
+        client.chat.completions.create.return_value = response
 
         result = summarize_email(config, client, sample_email)
 
@@ -118,11 +120,9 @@ class TestSummarizeEmail:
         assert result.priority == "low"
         assert result.model_confidence == 0.0
 
-    def test_blank_text_in_content_block_returns_fallback(
-        self, config: Config, sample_email: Email
-    ):
-        client = MagicMock(spec=anthropic.Anthropic)
-        client.messages.create.return_value = _make_mock_message("   ")
+    def test_blank_text_in_response_returns_fallback(self, config: Config, sample_email: Email):
+        client = MagicMock(spec=openai.OpenAI)
+        client.chat.completions.create.return_value = _make_mock_response("   ")
 
         result = summarize_email(config, client, sample_email)
 
@@ -152,19 +152,19 @@ class TestSummarizeBatch:
             links=[],
         )
 
-        client = MagicMock(spec=anthropic.Anthropic)
+        client = MagicMock(spec=openai.OpenAI)
 
-        def side_effect(*, model, max_tokens, system, messages):
-            content = messages[0]["content"]
-            if "Subject: Good Email" in content:
-                return _make_mock_message(_valid_llm_json())
-            raise anthropic.APIStatusError(
+        def side_effect(*, model, max_tokens, messages):
+            user_msg = messages[1]["content"]
+            if "Subject: Good Email" in user_msg:
+                return _make_mock_response(_valid_llm_json())
+            raise openai.APIStatusError(
                 message="Service Unavailable",
                 response=MagicMock(status_code=503),
                 body={},
             )
 
-        client.messages.create.side_effect = side_effect
+        client.chat.completions.create.side_effect = side_effect
 
         results = summarize_batch(config, client, [email_a, email_b])
 
@@ -180,8 +180,8 @@ class TestSummarizeBatch:
         assert summary_b.model_confidence == 0.0
 
     def test_returns_email_summary_pairs(self, config: Config, sample_email: Email):
-        client = MagicMock(spec=anthropic.Anthropic)
-        client.messages.create.return_value = _make_mock_message(_valid_llm_json())
+        client = MagicMock(spec=openai.OpenAI)
+        client.chat.completions.create.return_value = _make_mock_response(_valid_llm_json())
 
         results = summarize_batch(config, client, [sample_email])
 
@@ -191,6 +191,6 @@ class TestSummarizeBatch:
         assert isinstance(summary, EmailSummary)
 
     def test_empty_batch_returns_empty_list(self, config: Config):
-        client = MagicMock(spec=anthropic.Anthropic)
+        client = MagicMock(spec=openai.OpenAI)
         results = summarize_batch(config, client, [])
         assert results == []

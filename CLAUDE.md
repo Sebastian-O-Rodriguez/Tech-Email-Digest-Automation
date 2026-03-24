@@ -10,7 +10,7 @@
 |-------|--------|
 | Language | Python 3.12+ |
 | Email API | Microsoft Graph API (client credentials flow) |
-| LLM | Claude API (anthropic SDK) |
+| LLM | OpenRouter (openai SDK) |
 | Scheduling | GitHub Actions cron (twice daily) |
 | State | JSON file persisted via GitHub Actions cache |
 | Templates | Jinja2 (HTML digest) |

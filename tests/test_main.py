@@ -20,7 +20,7 @@ def _make_config() -> Config:
         azure_client_secret="client-secret",
         mailbox_user_id="user@example.com",
         mailbox_folder="Inbox",
-        anthropic_api_key="sk-test",
+        openrouter_api_key="sk-test",
         llm_model="claude-sonnet-4-6-20250514",
         digest_recipient="recipient@example.com",
         state_file="state.json",
@@ -73,7 +73,7 @@ _PATCHES = {
     "generate": "email_ingester.main.generate_digest",
     "send": "email_ingester.main.send_digest",
     "save_state": "email_ingester.main.save_state",
-    "anthropic": "email_ingester.main.anthropic.Anthropic",
+    "create_client": "email_ingester.main.create_client",
 }
 
 
@@ -98,7 +98,7 @@ class TestMainHappyPath:
             patch(_PATCHES["generate"], return_value=digest),
             patch(_PATCHES["send"]) as mock_send,
             patch(_PATCHES["save_state"]) as mock_save,
-            patch(_PATCHES["anthropic"]),
+            patch(_PATCHES["create_client"]),
         ):
             from email_ingester.main import main
 
@@ -127,7 +127,7 @@ class TestMainHappyPath:
             patch(_PATCHES["generate"], return_value=digest),
             patch(_PATCHES["send"]) as mock_send,
             patch(_PATCHES["save_state"]),
-            patch(_PATCHES["anthropic"]),
+            patch(_PATCHES["create_client"]),
         ):
             from email_ingester.main import main
 
@@ -155,7 +155,7 @@ class TestMainNoNewEmails:
             patch(_PATCHES["generate"]) as mock_generate,
             patch(_PATCHES["send"]) as mock_send,
             patch(_PATCHES["save_state"]) as mock_save,
-            patch(_PATCHES["anthropic"]),
+            patch(_PATCHES["create_client"]),
         ):
             from email_ingester.main import main
 
@@ -181,7 +181,7 @@ class TestMainNoNewEmails:
             patch(_PATCHES["fetch"], return_value=([], new_state)),
             patch(_PATCHES["send"]),
             patch(_PATCHES["save_state"]) as mock_save,
-            patch(_PATCHES["anthropic"]),
+            patch(_PATCHES["create_client"]),
         ):
             from email_ingester.main import main
 
@@ -212,7 +212,7 @@ class TestMainSendFailure:
             patch(_PATCHES["generate"], return_value=digest),
             patch(_PATCHES["send"], side_effect=Exception("send failed")),
             patch(_PATCHES["save_state"]) as mock_save,
-            patch(_PATCHES["anthropic"]),
+            patch(_PATCHES["create_client"]),
         ):
             from email_ingester.main import main
 
@@ -241,7 +241,7 @@ class TestMainSendFailure:
             patch(_PATCHES["generate"], return_value=digest),
             patch(_PATCHES["send"], side_effect=Exception("network down")),
             patch(_PATCHES["save_state"]) as mock_save,
-            patch(_PATCHES["anthropic"]),
+            patch(_PATCHES["create_client"]),
         ):
             from email_ingester.main import main
 

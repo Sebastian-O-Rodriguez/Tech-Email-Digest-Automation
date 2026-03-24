@@ -9,8 +9,6 @@ import logging
 import sys
 from pathlib import Path
 
-import anthropic
-
 from email_ingester.auth import get_graph_token
 from email_ingester.config import Config
 from email_ingester.digest import generate_digest
@@ -19,7 +17,7 @@ from email_ingester.processor import process_email
 from email_ingester.scorer import score_and_rank
 from email_ingester.sender import send_digest
 from email_ingester.state import load_state, save_state
-from email_ingester.summarizer import summarize_batch
+from email_ingester.summarizer import create_client, summarize_batch
 
 logging.basicConfig(
     level=logging.INFO,
@@ -62,7 +60,7 @@ def main() -> None:
 
     # 6. Summarize via LLM
     logger.info("Summarizing %d emails via LLM", len(processed_emails))
-    client = anthropic.Anthropic(api_key=config.anthropic_api_key)
+    client = create_client(config)
     summarized = summarize_batch(config, client, processed_emails)
 
     # 7. Score and rank

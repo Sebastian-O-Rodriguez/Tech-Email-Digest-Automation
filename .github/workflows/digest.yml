@@ -72,7 +72,7 @@ jobs:
           AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
           MAILBOX_USER_ID: ${{ secrets.MAILBOX_USER_ID }}
           MAILBOX_FOLDER: ${{ secrets.MAILBOX_FOLDER }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           # DIGEST_RECIPIENT defaults to MAILBOX_USER_ID if not set.
           # Add DIGEST_RECIPIENT secret if sending to a different address.
         run: python -m email_ingester

@@ -1,4 +1,4 @@
-"""LLM-based email summarization using Claude API.
+"""LLM-based email summarization via OpenRouter (OpenAI-compatible API).
 
 Data flow: Email → summarize_email() → EmailSummary
 The scorer then combines EmailSummary + Email → ProcessedEmail.
@@ -10,16 +10,16 @@ import json
 import logging
 from typing import TYPE_CHECKING
 
-import anthropic as anthropic_module
+import openai
 
 from email_ingester.models import Email, EmailSummary  # noqa: TC001
 
 if TYPE_CHECKING:
-    import anthropic
-
     from email_ingester.config import Config
 
 logger = logging.getLogger(__name__)
+
+_OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
 _SYSTEM_PROMPT = """\
 You are an email analysis assistant. Given an email, produce a structured JSON summary.
@@ -53,8 +53,16 @@ def _fallback_summary(email_id: str, reason: str) -> EmailSummary:
     )
 
 
-def summarize_email(config: Config, client: anthropic.Anthropic, email: Email) -> EmailSummary:
-    """Summarize a single email using the Claude API.
+def create_client(config: Config) -> openai.OpenAI:
+    """Create an OpenAI client configured for OpenRouter."""
+    return openai.OpenAI(
+        base_url=_OPENROUTER_BASE_URL,
+        api_key=config.openrouter_api_key,
+    )
+
+
+def summarize_email(config: Config, client: openai.OpenAI, email: Email) -> EmailSummary:
+    """Summarize a single email using the LLM via OpenRouter.
 
     Returns an EmailSummary (intermediate type). The scorer combines this
     with the original Email to produce a final ProcessedEmail.
@@ -73,28 +81,30 @@ Links found:
 {chr(10).join(email.links[:20]) if email.links else "(none)"}"""
 
     try:
-        message = client.messages.create(
+        response = client.chat.completions.create(
             model=config.llm_model,
             max_tokens=512,
-            system=_SYSTEM_PROMPT,
-            messages=[{"role": "user", "content": user_content}],
+            messages=[
+                {"role": "system", "content": _SYSTEM_PROMPT},
+                {"role": "user", "content": user_content},
+            ],
         )
-    except anthropic_module.APIError as exc:
+    except openai.APIError as exc:
         logger.error(
-            "Anthropic API error while summarizing email %s: %s",
+            "OpenRouter API error while summarizing email %s: %s",
             email.id,
             exc,
         )
         return _fallback_summary(email.id, reason="api_error")
 
-    if not message.content:
+    if not response.choices:
         logger.warning(
-            "Empty content in LLM response for email %s; using fallback summary.",
+            "Empty choices in LLM response for email %s; using fallback summary.",
             email.id,
         )
         return _fallback_summary(email.id, reason="empty_content")
 
-    raw = message.content[0].text
+    raw = response.choices[0].message.content
 
     if not raw or not raw.strip():
         logger.warning(
@@ -126,7 +136,7 @@ Links found:
 
 
 def summarize_batch(
-    config: Config, client: anthropic.Anthropic, emails: list[Email]
+    config: Config, client: openai.OpenAI, emails: list[Email]
 ) -> list[tuple[Email, EmailSummary]]:
     """Summarize a batch of emails sequentially.
 

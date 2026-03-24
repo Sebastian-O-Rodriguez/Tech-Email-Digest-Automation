@@ -17,8 +17,8 @@ class Config:
     mailbox_user_id: str
     mailbox_folder: str
 
-    # Claude API
-    anthropic_api_key: str
+    # LLM (OpenRouter)
+    openrouter_api_key: str
     llm_model: str
 
     # Digest
@@ -46,8 +46,8 @@ class Config:
             azure_client_secret=require("AZURE_CLIENT_SECRET"),
             mailbox_user_id=mailbox_user_id,
             mailbox_folder=os.environ.get("MAILBOX_FOLDER", "Inbox"),
-            anthropic_api_key=require("ANTHROPIC_API_KEY"),
-            llm_model=os.environ.get("LLM_MODEL", "claude-sonnet-4-6-20250514"),
+            openrouter_api_key=require("OPENROUTER_API_KEY"),
+            llm_model=os.environ.get("LLM_MODEL", "anthropic/claude-sonnet-4"),
             digest_recipient=os.environ.get("DIGEST_RECIPIENT", mailbox_user_id),
             state_file=os.environ.get("STATE_FILE", "state.json"),
         )
