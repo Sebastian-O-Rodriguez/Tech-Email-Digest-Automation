@@ -1,0 +1,85 @@
+name: Email Digest
+
+on:
+  schedule:
+    # 6:00 AM America/New_York
+    # EST (Nov-Mar): UTC-5 -> 11:00 UTC
+    # EDT (Mar-Nov): UTC-4 -> 10:00 UTC
+    - cron: '0 10 * * *'   # 6 AM EDT
+    - cron: '0 11 * * *'   # 6 AM EST
+
+    # 5:00 PM America/New_York
+    # EST (Nov-Mar): UTC-5 -> 22:00 UTC
+    # EDT (Mar-Nov): UTC-4 -> 21:00 UTC
+    - cron: '0 21 * * *'   # 5 PM EDT
+    - cron: '0 22 * * *'   # 5 PM EST
+
+  workflow_dispatch: {}  # Manual trigger for testing
+
+concurrency:
+  group: email-digest
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  PYTHON_VERSION: '3.12'
+  STATE_FILE: state.json
+  TZ: America/New_York
+
+jobs:
+  digest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: pip install .
+
+      # DST guard: skip if this cron fired outside the target hour.
+      # During DST transitions, both cron times fire but only one is correct.
+      - name: DST guard
+        id: dst
+        run: |
+          HOUR=$(TZ=America/New_York date +%H)
+          if [[ "$HOUR" != "06" && "$HOUR" != "17" ]]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "Skipping: current hour in America/New_York is $HOUR (not 06 or 17)"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Restore state
+        if: steps.dst.outputs.skip != 'true'
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ env.STATE_FILE }}
+          key: email-ingester-state
+
+      - name: Run digest pipeline
+        if: steps.dst.outputs.skip != 'true'
+        env:
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          MAILBOX_USER_ID: ${{ secrets.MAILBOX_USER_ID }}
+          MAILBOX_FOLDER: ${{ secrets.MAILBOX_FOLDER }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          # DIGEST_RECIPIENT defaults to MAILBOX_USER_ID if not set.
+          # Add DIGEST_RECIPIENT secret if sending to a different address.
+        run: python -m email_ingester
+
+      - name: Save state
+        if: steps.dst.outputs.skip != 'true' && (success() || failure())
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ env.STATE_FILE }}
+          key: email-ingester-state
