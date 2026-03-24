@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 
 import openai
 
-from email_ingester.models import DigestReport, Email, Footnote  # noqa: TC001
+from email_ingester.models import DigestReport, Email  # noqa: TC001
 
 if TYPE_CHECKING:
     from email_ingester.config import Config
@@ -27,37 +27,31 @@ a concise daily brief from a batch of newsletter emails. Your reader is a \
 technical leader who needs to stay current on backend, frontend, design, dev \
 tooling, B2B software, and AI/ML.
 
-Read all the emails below (numbered [1], [2], etc.) and produce ONE \
-aggregated JSON report. Do not summarize each email individually. \
-Synthesize and group the information.
+The emails below are numbered [1], [2], etc. Read them all and produce ONE \
+aggregated JSON report. Do not summarize each email individually. Synthesize \
+and group the information.
 
 Respond with ONLY valid JSON in this exact format:
 {
-  "breaking_news": "Dense notes with inline footnote refs like [1] [3]",
-  "tech_stacks": "Dense notes with inline footnote refs like [2] [5]",
-  "new_software": "Dense notes with inline footnote refs",
-  "deep_dives": "Dense notes with inline footnote refs",
-  "footnotes": [
-    {"title": "Short title", "url": "https://..."},
-    {"title": "Short title", "url": "https://..."}
-  ],
-  "source_emails": [1, 3, 5, 12]
+  "breaking_news": "Dense notes with source refs like [1] [3]",
+  "tech_stacks": "Dense notes with source refs like [2] [5]",
+  "new_software": "Dense notes with source refs",
+  "deep_dives": "Dense notes with source refs",
+  "sources": [1, 3, 5, 12]
 }
 
 Rules:
-- Total report must be under 1500 characters (excluding footnotes).
+- Total report must be under 1500 characters.
 - Write in dense, telegraphic style. No full sentences. Use semicolons to \
 separate items within a section. Pack maximum information per character.
-- Embed footnote references inline as [1], [2], etc. Each number corresponds \
-to the footnote at that position in the footnotes array. Place the reference \
-right after the relevant claim.
-- Example: "Deno 2.1 drops Node compat layer [1]; Bun adds S3 native \
-client [2]; Cloudflare Workers now supports Python 3.12 [3]."
+- After each claim, put the source email number in brackets. These numbers \
+match the input email numbers [1], [2], etc. The reader can click these to \
+open the original email.
+- Example: "Deno 2.1 drops Node compat layer [4]; Bun adds S3 native \
+client [7]; Cloudflare Workers now supports Python 3.12 [12]."
 - Never use em dashes.
 - Never start items with "Notable:" or "Key:" or similar labels.
-- Footnotes: 5-10 most important article links. Short titles.
-- source_emails: list the input email numbers (e.g. [1], [5], [12]) that \
-contributed to the report. Only include emails you actually referenced.
+- sources: list ALL input email numbers you referenced in the report.
 - If a section has nothing, write "Nothing notable this cycle."
 """
 
@@ -70,7 +64,6 @@ def _fallback_report(reason: str) -> DigestReport:
         tech_stacks="",
         new_software="",
         deep_dives="",
-        footnotes=[],
     )
 
 
@@ -142,13 +135,8 @@ def generate_report(config: Config, client: openai.OpenAI, emails: list[Email]) 
         logger.warning("JSON parse error: %s -- raw: %.300s", exc, raw)
         return _fallback_report(reason="json_parse_error")
 
-    footnotes = []
-    for i, fn in enumerate(data.get("footnotes", []), 1):
-        if isinstance(fn, dict) and fn.get("title") and fn.get("url"):
-            footnotes.append(Footnote(index=i, title=fn["title"], url=fn["url"]))
-
     source_indices = []
-    for idx in data.get("source_emails", []):
+    for idx in data.get("sources", []):
         if isinstance(idx, int):
             source_indices.append(idx)
 
@@ -157,6 +145,5 @@ def generate_report(config: Config, client: openai.OpenAI, emails: list[Email]) 
         tech_stacks=data.get("tech_stacks", ""),
         new_software=data.get("new_software", ""),
         deep_dives=data.get("deep_dives", ""),
-        footnotes=footnotes,
         source_indices=source_indices,
     )

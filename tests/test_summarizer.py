@@ -64,14 +64,11 @@ def _make_mock_response(text: str) -> MagicMock:
 def _valid_report_json() -> str:
     return json.dumps(
         {
-            "breaking_news": "AWS us-east-1 experienced a major outage.",
-            "tech_stacks": "React 20 ships server components by default.",
+            "breaking_news": "AWS us-east-1 experienced a major outage [1].",
+            "tech_stacks": "React 20 ships server components by default [2].",
             "new_software": "No notable releases this cycle.",
             "deep_dives": "No deep dives worth flagging.",
-            "footnotes": [
-                {"title": "AWS outage details", "url": "https://example.com/outage"},
-                {"title": "React 20 announcement", "url": "https://example.com/react20"},
-            ],
+            "sources": [1, 2],
         }
     )
 
@@ -86,9 +83,7 @@ class TestGenerateReport:
         assert isinstance(result, DigestReport)
         assert "outage" in result.breaking_news.lower()
         assert "react" in result.tech_stacks.lower()
-        assert len(result.footnotes) == 2
-        assert result.footnotes[0].title == "AWS outage details"
-        assert result.footnotes[0].url == "https://example.com/outage"
+        assert result.source_indices == [1, 2]
 
     def test_api_error_returns_fallback(self, config: Config, sample_emails: list[Email]):
         client = MagicMock(spec=openai.OpenAI)
@@ -126,24 +121,18 @@ class TestGenerateReport:
         result = generate_report(config, client, sample_emails)
         assert "failed" in result.breaking_news.lower()
 
-    def test_malformed_footnotes_skipped(self, config: Config, sample_emails: list[Email]):
+    def test_non_int_sources_skipped(self, config: Config, sample_emails: list[Email]):
         client = MagicMock(spec=openai.OpenAI)
         data = json.dumps(
             {
-                "breaking_news": "Test",
-                "tech_stacks": "Test",
-                "new_software": "Test",
-                "deep_dives": "Test",
-                "footnotes": [
-                    {"title": "Good", "url": "https://example.com"},
-                    {"title": "", "url": ""},
-                    "not a dict",
-                    {"title": "No URL"},
-                ],
+                "breaking_news": "Test [1]",
+                "tech_stacks": "",
+                "new_software": "",
+                "deep_dives": "",
+                "sources": [1, "bad", None, 2],
             }
         )
         client.chat.completions.create.return_value = _make_mock_response(data)
 
         result = generate_report(config, client, sample_emails)
-        assert len(result.footnotes) == 1
-        assert result.footnotes[0].title == "Good"
+        assert result.source_indices == [1, 2]
