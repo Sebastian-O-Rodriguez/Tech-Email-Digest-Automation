@@ -70,8 +70,8 @@ jobs:
           AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
           AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
           AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
-          MAILBOX_USER_ID: ${{ secrets.MAILBOX_USER_ID }}
-          MAILBOX_FOLDER: ${{ secrets.MAILBOX_FOLDER }}
+          MAILBOX_USER: ${{ secrets.MAILBOX_USER }}
+          TARGET_FOLDER_NAME: ${{ secrets.TARGET_FOLDER_NAME }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           # DIGEST_RECIPIENT defaults to MAILBOX_USER_ID if not set.
           # Add DIGEST_RECIPIENT secret if sending to a different address.

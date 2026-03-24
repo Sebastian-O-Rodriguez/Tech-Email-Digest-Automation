@@ -38,14 +38,14 @@ class Config:
                 raise OSError(msg)
             return value
 
-        mailbox_user_id = require("MAILBOX_USER_ID")
+        mailbox_user_id = require("MAILBOX_USER")
 
         return cls(
             azure_tenant_id=require("AZURE_TENANT_ID"),
             azure_client_id=require("AZURE_CLIENT_ID"),
             azure_client_secret=require("AZURE_CLIENT_SECRET"),
             mailbox_user_id=mailbox_user_id,
-            mailbox_folder=os.environ.get("MAILBOX_FOLDER", "Inbox"),
+            mailbox_folder=os.environ.get("TARGET_FOLDER_NAME", "Inbox"),
             openrouter_api_key=require("OPENROUTER_API_KEY"),
             llm_model=os.environ.get("LLM_MODEL", "anthropic/claude-sonnet-4"),
             digest_recipient=os.environ.get("DIGEST_RECIPIENT", mailbox_user_id),
