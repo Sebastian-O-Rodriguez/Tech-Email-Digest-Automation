@@ -123,8 +123,16 @@ def generate_report(config: Config, client: openai.OpenAI, emails: list[Email]) 
         logger.error("LLM returned blank response")
         return _fallback_report(reason="blank_response")
 
+    # Strip markdown code fences if present (```json ... ```)
+    cleaned = raw.strip()
+    if cleaned.startswith("```"):
+        cleaned = cleaned.split("\n", 1)[1] if "\n" in cleaned else cleaned[3:]
+    if cleaned.endswith("```"):
+        cleaned = cleaned[:-3]
+    cleaned = cleaned.strip()
+
     try:
-        data = json.loads(raw)
+        data = json.loads(cleaned)
     except json.JSONDecodeError as exc:
         logger.warning("JSON parse error: %s -- raw: %.300s", exc, raw)
         return _fallback_report(reason="json_parse_error")
