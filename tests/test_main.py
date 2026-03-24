@@ -21,7 +21,7 @@ def _make_config() -> Config:
         mailbox_user_id="user@example.com",
         mailbox_folder="Inbox",
         openrouter_api_key="sk-test",
-        llm_model="claude-sonnet-4-6-20250514",
+        llm_model="anthropic/claude-sonnet-4",
         digest_recipient="recipient@example.com",
         state_file="state.json",
     )
@@ -43,9 +43,7 @@ def _make_processed_email() -> ProcessedEmail:
     return ProcessedEmail(
         email=_make_raw_email(),
         summary="A test email summary.",
-        priority="high",
-        why_it_matters="It matters.",
-        recommended_action="Read it.",
+        topic="breaking_news",
         key_links=["https://example.com"],
         score=0.8,
     )
@@ -56,7 +54,7 @@ def _make_digest() -> DigestOutput:
     return DigestOutput(
         generated_at=datetime(2026, 3, 23, 10, 0, tzinfo=UTC),
         total_processed=1,
-        high_priority=[processed],
+        breaking_news=[processed],
         html="<html><body>Digest</body></html>",
     )
 

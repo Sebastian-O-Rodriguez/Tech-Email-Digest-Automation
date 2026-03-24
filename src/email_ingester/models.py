@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Literal
 
-Priority = Literal["high", "medium", "low"]
+Topic = Literal["breaking_news", "tech_stacks", "new_software", "deep_dives"]
 
 
 @dataclass(frozen=True)
@@ -34,9 +34,7 @@ class EmailSummary:
 
     email_id: str
     summary: str
-    priority: Priority
-    why_it_matters: str
-    recommended_action: str
+    topic: Topic
     key_links: list[str] = field(default_factory=list)
     model_confidence: float = 0.0
 
@@ -47,9 +45,7 @@ class ProcessedEmail:
 
     email: Email
     summary: str
-    priority: Priority
-    why_it_matters: str
-    recommended_action: str
+    topic: Topic
     key_links: list[str] = field(default_factory=list)
     score: float = 0.0
 
@@ -60,9 +56,10 @@ class DigestOutput:
 
     generated_at: datetime
     total_processed: int
-    high_priority: list[ProcessedEmail] = field(default_factory=list)
-    medium_priority: list[ProcessedEmail] = field(default_factory=list)
-    low_priority_count: int = 0
+    breaking_news: list[ProcessedEmail] = field(default_factory=list)
+    tech_stacks: list[ProcessedEmail] = field(default_factory=list)
+    new_software: list[ProcessedEmail] = field(default_factory=list)
+    deep_dives: list[ProcessedEmail] = field(default_factory=list)
     html: str = ""
 
 

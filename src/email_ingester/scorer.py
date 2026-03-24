@@ -1,4 +1,4 @@
-"""Hybrid scoring: combine rule-based signals with LLM priority.
+"""Hybrid scoring: combine rule-based signals with LLM topic classification.
 
 Data flow: (Email, EmailSummary) → score_email() → ProcessedEmail
 Rule-based signals come from Email; LLM signals come from EmailSummary.
@@ -16,27 +16,27 @@ from email_ingester.models import ProcessedEmail as _ProcessedEmail
 
 logger = logging.getLogger(__name__)
 
-# Priority weights from LLM
-_PRIORITY_SCORES = {
-    "high": 1.0,
-    "medium": 0.5,
-    "low": 0.1,
+# Topic base scores — breaking news is most important
+_TOPIC_SCORES = {
+    "breaking_news": 1.0,
+    "tech_stacks": 0.7,
+    "new_software": 0.6,
+    "deep_dives": 0.4,
 }
 
 # Rule-based score adjustments
 _LINK_BONUS = 0.1  # Per useful link (max 3)
 _SHORT_SUBJECT_PENALTY = -0.05  # Subject < 10 chars (likely auto-generated)
 _LONG_BODY_BONUS = 0.05  # Substantial content (> 500 chars)
-_CONFIDENCE_WEIGHT = 0.0  # Disabled: model_confidence is synthetic (always 0.5)
 
 
 def score_email(email: Email, summary: EmailSummary) -> ProcessedEmail:
     """Apply hybrid scoring by combining rule-based signals with LLM output."""
-    base = _PRIORITY_SCORES.get(summary.priority, 0.1)
-    if summary.priority not in _PRIORITY_SCORES:
+    base = _TOPIC_SCORES.get(summary.topic, 0.4)
+    if summary.topic not in _TOPIC_SCORES:
         logger.warning(
-            "Unknown priority %r for email %s — defaulting base score to 0.1",
-            summary.priority,
+            "Unknown topic %r for email %s — defaulting base score to 0.4",
+            summary.topic,
             email.id,
         )
 
@@ -50,35 +50,28 @@ def score_email(email: Email, summary: EmailSummary) -> ProcessedEmail:
     long_body = len(email.body_text) > 500
     body_adj = _LONG_BODY_BONUS if long_body else 0.0
 
-    confidence_adj = summary.model_confidence * _CONFIDENCE_WEIGHT
-
-    adjustment = link_adj + subject_adj + body_adj + confidence_adj
+    adjustment = link_adj + subject_adj + body_adj
     raw_score = base + adjustment
     final_score = round(max(0.0, min(1.0, raw_score)), 3)
 
     logger.debug(
-        "Score breakdown for email %s (%r): "
-        "base=%.3f link_adj=%.3f subject_adj=%.3f body_adj=%.3f "
-        "confidence_adj=%.3f (confidence=%.3f) raw=%.3f final=%.3f priority=%s",
+        "Score for email %s (%r): base=%.3f link=%.3f subj=%.3f "
+        "body=%.3f raw=%.3f final=%.3f topic=%s",
         email.id,
         email.subject[:50],
         base,
         link_adj,
         subject_adj,
         body_adj,
-        confidence_adj,
-        summary.model_confidence,
         raw_score,
         final_score,
-        summary.priority,
+        summary.topic,
     )
 
     return _ProcessedEmail(
         email=email,
         summary=summary.summary,
-        priority=summary.priority,
-        why_it_matters=summary.why_it_matters,
-        recommended_action=summary.recommended_action,
+        topic=summary.topic,
         key_links=summary.key_links,
         score=final_score,
     )

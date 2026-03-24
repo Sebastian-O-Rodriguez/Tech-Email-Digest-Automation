@@ -71,10 +71,11 @@ def main() -> None:
     logger.info("Generating digest")
     digest = generate_digest(ranked)
     logger.info(
-        "Digest: %d high, %d medium, %d low",
-        len(digest.high_priority),
-        len(digest.medium_priority),
-        digest.low_priority_count,
+        "Digest: %d breaking, %d stacks, %d software, %d dives",
+        len(digest.breaking_news),
+        len(digest.tech_stacks),
+        len(digest.new_software),
+        len(digest.deep_dives),
     )
 
     # 9. Send digest — failure should not prevent state save

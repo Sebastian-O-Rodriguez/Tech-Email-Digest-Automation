@@ -21,22 +21,25 @@ logger = logging.getLogger(__name__)
 
 _OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
+_VALID_TOPICS = frozenset({"breaking_news", "tech_stacks", "new_software", "deep_dives"})
+
 _SYSTEM_PROMPT = """\
 You are an email analysis assistant. Given an email, produce a structured JSON summary.
 
 Respond with ONLY valid JSON in this exact format:
 {
-  "summary": "2-3 sentence summary of the email content",
-  "priority": "high|medium|low",
-  "why_it_matters": "1 sentence on why this is worth reading",
-  "recommended_action": "1 sentence on what to do (read, skim, ignore, follow link, etc.)",
-  "key_links": ["list of the most useful URLs from the email, max 3"]
+  "summary": "One-line summary, max 75 characters",
+  "topic": "breaking_news|tech_stacks|new_software|deep_dives",
+  "key_links": ["most useful URLs from the email, max 3"]
 }
 
-Priority guidelines:
-- high: actionable content, important articles, time-sensitive info
-- medium: useful but not urgent, interesting reads
-- low: newsletters with nothing notable, promotions, routine updates
+Topic guidelines:
+- breaking_news: urgent updates, security alerts, outages, major announcements
+- tech_stacks: frameworks, languages, infrastructure, architecture trends
+- new_software: tools, apps, product launches, version releases
+- deep_dives: tutorials, in-depth articles, analyses, long-form content
+
+Keep the summary punchy — one sentence, max 75 characters. No filler words.
 """
 
 
@@ -45,9 +48,7 @@ def _fallback_summary(email_id: str, reason: str) -> EmailSummary:
     return EmailSummary(
         email_id=email_id,
         summary="(summarization failed)",
-        priority="low",
-        why_it_matters="",
-        recommended_action="",
+        topic="deep_dives",
         key_links=[],
         model_confidence=0.0,
     )
@@ -68,7 +69,7 @@ def summarize_email(config: Config, client: openai.OpenAI, email: Email) -> Emai
     with the original Email to produce a final ProcessedEmail.
 
     On LLM API errors or JSON parse failures, logs the error and returns a
-    fallback EmailSummary with summary="(summarization failed)" and priority="low".
+    fallback EmailSummary with topic="deep_dives".
     """
     user_content = f"""Subject: {email.subject}
 From: {email.sender}
@@ -83,7 +84,7 @@ Links found:
     try:
         response = client.chat.completions.create(
             model=config.llm_model,
-            max_tokens=512,
+            max_tokens=256,
             messages=[
                 {"role": "system", "content": _SYSTEM_PROMPT},
                 {"role": "user", "content": user_content},
@@ -124,12 +125,15 @@ Links found:
         )
         return _fallback_summary(email.id, reason="json_parse_error")
 
+    topic = data.get("topic", "deep_dives")
+    if topic not in _VALID_TOPICS:
+        logger.warning("Unknown topic %r for email %s, defaulting to deep_dives", topic, email.id)
+        topic = "deep_dives"
+
     return EmailSummary(
         email_id=email.id,
-        summary=data.get("summary", ""),
-        priority=data.get("priority", "low"),
-        why_it_matters=data.get("why_it_matters", ""),
-        recommended_action=data.get("recommended_action", ""),
+        summary=data.get("summary", "")[:75],
+        topic=topic,
         key_links=data.get("key_links", []),
         model_confidence=0.5,
     )

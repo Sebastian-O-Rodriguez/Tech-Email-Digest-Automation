@@ -55,9 +55,7 @@ def _valid_llm_json() -> str:
     return json.dumps(
         {
             "summary": "A useful article on engineering.",
-            "priority": "medium",
-            "why_it_matters": "Relevant to current work.",
-            "recommended_action": "Read the article.",
+            "topic": "deep_dives",
             "key_links": ["https://example.com/article"],
         }
     )
@@ -75,9 +73,7 @@ class TestSummarizeEmail:
         assert isinstance(result, EmailSummary)
         assert result.email_id == sample_email.id
         assert result.summary == "A useful article on engineering."
-        assert result.priority == "medium"
-        assert result.why_it_matters == "Relevant to current work."
-        assert result.recommended_action == "Read the article."
+        assert result.topic == "deep_dives"
         assert result.key_links == ["https://example.com/article"]
         assert result.model_confidence == 0.5
 
@@ -90,7 +86,7 @@ class TestSummarizeEmail:
         assert isinstance(result, EmailSummary)
         assert result.email_id == sample_email.id
         assert result.summary == "(summarization failed)"
-        assert result.priority == "low"
+        assert result.topic == "deep_dives"
         assert result.model_confidence == 0.0
 
     def test_api_error_returns_fallback(self, config: Config, sample_email: Email):
@@ -105,7 +101,7 @@ class TestSummarizeEmail:
 
         assert isinstance(result, EmailSummary)
         assert result.summary == "(summarization failed)"
-        assert result.priority == "low"
+        assert result.topic == "deep_dives"
         assert result.model_confidence == 0.0
 
     def test_empty_choices_in_response_returns_fallback(self, config: Config, sample_email: Email):
@@ -117,7 +113,7 @@ class TestSummarizeEmail:
         result = summarize_email(config, client, sample_email)
 
         assert result.summary == "(summarization failed)"
-        assert result.priority == "low"
+        assert result.topic == "deep_dives"
         assert result.model_confidence == 0.0
 
     def test_blank_text_in_response_returns_fallback(self, config: Config, sample_email: Email):
@@ -127,8 +123,25 @@ class TestSummarizeEmail:
         result = summarize_email(config, client, sample_email)
 
         assert result.summary == "(summarization failed)"
-        assert result.priority == "low"
+        assert result.topic == "deep_dives"
         assert result.model_confidence == 0.0
+
+    def test_unknown_topic_defaults_to_deep_dives(self, config: Config, sample_email: Email):
+        client = MagicMock(spec=openai.OpenAI)
+        bad_topic_json = json.dumps({"summary": "Test", "topic": "garbage", "key_links": []})
+        client.chat.completions.create.return_value = _make_mock_response(bad_topic_json)
+
+        result = summarize_email(config, client, sample_email)
+        assert result.topic == "deep_dives"
+
+    def test_summary_truncated_to_75_chars(self, config: Config, sample_email: Email):
+        client = MagicMock(spec=openai.OpenAI)
+        long_summary = "A" * 100
+        long_json = json.dumps({"summary": long_summary, "topic": "breaking_news", "key_links": []})
+        client.chat.completions.create.return_value = _make_mock_response(long_json)
+
+        result = summarize_email(config, client, sample_email)
+        assert len(result.summary) <= 75
 
 
 class TestSummarizeBatch:
