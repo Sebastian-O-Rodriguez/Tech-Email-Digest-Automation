@@ -36,8 +36,8 @@ def send_digest(config: Config, token: str, digest: DigestOutput) -> None:
         "Content-Type": "application/json",
     }
 
-    timestamp = digest.generated_at.strftime("%B %d, %Y %I:%M %p UTC")
-    subject = f"Email Digest — {timestamp}"
+    date_str = digest.generated_at.strftime("%d %B Digest")
+    subject = date_str
 
     payload = {
         "message": {

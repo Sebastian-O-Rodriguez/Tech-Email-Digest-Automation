@@ -28,8 +28,8 @@
 <div class="container">
 
   <div class="header">
-    <h1>Guava AI Daily Brief</h1>
-    <div class="meta">{{ digest.generated_at.strftime('%B %d, %Y at %I:%M %p UTC') }} | {{ digest.total_processed }} source{{ 's' if digest.total_processed != 1 else '' }} analyzed</div>
+    <h1>{{ digest.generated_at.strftime('%d %B Digest') }}</h1>
+    <div class="meta">{{ digest.total_processed }} source{{ 's' if digest.total_processed != 1 else '' }} analyzed</div>
   </div>
 
   {% if digest.report.breaking_news %}

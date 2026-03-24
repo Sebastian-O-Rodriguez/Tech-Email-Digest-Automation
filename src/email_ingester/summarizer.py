@@ -32,28 +32,31 @@ summarize each email individually. Synthesize and group the information.
 
 Respond with ONLY valid JSON in this exact format:
 {
-  "breaking_news": "2-3 sentences on urgent developments, outages, security \
-alerts, or major announcements. If nothing qualifies, write 'No breaking news \
-this cycle.'",
-  "tech_stacks": "2-3 sentences on backend, frontend, infrastructure, \
-architecture, or framework trends worth noting.",
-  "new_software": "2-3 sentences on new tools, product launches, version \
-releases, or dev tooling updates relevant to building software.",
-  "deep_dives": "2-3 sentences on notable long-form content, tutorials, or \
-analyses worth reading later.",
+  "breaking_news": "Dense bullet-style notes on urgent developments, outages, \
+security alerts, major announcements. Pack in specifics: names, versions, \
+dates. If nothing qualifies, write 'Nothing breaking this cycle.'",
+  "tech_stacks": "Dense bullet-style notes on backend, frontend, infra, \
+architecture, framework trends. Include specific tech names and what changed.",
+  "new_software": "Dense bullet-style notes on new tools, product launches, \
+version releases, dev tooling. Name the product, what it does, why it matters.",
+  "deep_dives": "Dense bullet-style notes on notable long-form content, \
+tutorials, analyses. Name the topic and source.",
   "footnotes": [
-    {"title": "Short article title", "url": "https://..."},
-    {"title": "Short article title", "url": "https://..."}
+    {"title": "Short title", "url": "https://..."},
+    {"title": "Short title", "url": "https://..."}
   ]
 }
 
 Rules:
 - Total report must be under 1500 characters (excluding footnotes).
-- Use business imperative tone. Be direct. No filler.
+- Write in dense, telegraphic style. No full sentences. Use semicolons to \
+separate items within a section. Pack maximum information per character.
+- Example style: "Deno 2.1 drops Node compat layer; Bun adds S3 native \
+client; Cloudflare Workers now supports Python 3.12 runtime."
 - Never use em dashes.
-- Aggregate related news into single statements.
-- Footnotes: include the 5-10 most important article links. Use short titles.
-- If a section has nothing noteworthy, say so in one sentence.
+- Never start items with "Notable:" or "Key:" or similar labels.
+- Footnotes: 5-10 most important links. Short titles.
+- If a section has nothing, write "Nothing notable this cycle."
 """
 
 
