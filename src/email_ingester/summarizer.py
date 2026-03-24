@@ -27,35 +27,37 @@ a concise daily brief from a batch of newsletter emails. Your reader is a \
 technical leader who needs to stay current on backend, frontend, design, dev \
 tooling, B2B software, and AI/ML.
 
-Read all the emails below and produce ONE aggregated JSON report. Do not \
-summarize each email individually. Synthesize and group the information.
+Read all the emails below (numbered [1], [2], etc.) and produce ONE \
+aggregated JSON report. Do not summarize each email individually. \
+Synthesize and group the information.
 
 Respond with ONLY valid JSON in this exact format:
 {
-  "breaking_news": "Dense bullet-style notes on urgent developments, outages, \
-security alerts, major announcements. Pack in specifics: names, versions, \
-dates. If nothing qualifies, write 'Nothing breaking this cycle.'",
-  "tech_stacks": "Dense bullet-style notes on backend, frontend, infra, \
-architecture, framework trends. Include specific tech names and what changed.",
-  "new_software": "Dense bullet-style notes on new tools, product launches, \
-version releases, dev tooling. Name the product, what it does, why it matters.",
-  "deep_dives": "Dense bullet-style notes on notable long-form content, \
-tutorials, analyses. Name the topic and source.",
+  "breaking_news": "Dense notes with inline footnote refs like [1] [3]",
+  "tech_stacks": "Dense notes with inline footnote refs like [2] [5]",
+  "new_software": "Dense notes with inline footnote refs",
+  "deep_dives": "Dense notes with inline footnote refs",
   "footnotes": [
     {"title": "Short title", "url": "https://..."},
     {"title": "Short title", "url": "https://..."}
-  ]
+  ],
+  "source_emails": [1, 3, 5, 12]
 }
 
 Rules:
 - Total report must be under 1500 characters (excluding footnotes).
 - Write in dense, telegraphic style. No full sentences. Use semicolons to \
 separate items within a section. Pack maximum information per character.
-- Example style: "Deno 2.1 drops Node compat layer; Bun adds S3 native \
-client; Cloudflare Workers now supports Python 3.12 runtime."
+- Embed footnote references inline as [1], [2], etc. Each number corresponds \
+to the footnote at that position in the footnotes array. Place the reference \
+right after the relevant claim.
+- Example: "Deno 2.1 drops Node compat layer [1]; Bun adds S3 native \
+client [2]; Cloudflare Workers now supports Python 3.12 [3]."
 - Never use em dashes.
 - Never start items with "Notable:" or "Key:" or similar labels.
-- Footnotes: 5-10 most important links. Short titles.
+- Footnotes: 5-10 most important article links. Short titles.
+- source_emails: list the input email numbers (e.g. [1], [5], [12]) that \
+contributed to the report. Only include emails you actually referenced.
 - If a section has nothing, write "Nothing notable this cycle."
 """
 
@@ -145,10 +147,16 @@ def generate_report(config: Config, client: openai.OpenAI, emails: list[Email]) 
         if isinstance(fn, dict) and fn.get("title") and fn.get("url"):
             footnotes.append(Footnote(index=i, title=fn["title"], url=fn["url"]))
 
+    source_indices = []
+    for idx in data.get("source_emails", []):
+        if isinstance(idx, int):
+            source_indices.append(idx)
+
     return DigestReport(
         breaking_news=data.get("breaking_news", ""),
         tech_stacks=data.get("tech_stacks", ""),
         new_software=data.get("new_software", ""),
         deep_dives=data.get("deep_dives", ""),
         footnotes=footnotes,
+        source_indices=source_indices,
     )

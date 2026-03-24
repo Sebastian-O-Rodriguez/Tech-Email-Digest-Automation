@@ -15,9 +15,8 @@
   .software .section-label { color: #27ae60; border-color: #27ae60; }
   .dives .section-label { color: #8e44ad; border-color: #8e44ad; }
   .section-body { font-size: 13px; line-height: 1.5; color: #333; margin: 0 0 8px 0; }
-  .fn-buttons { margin: 0 0 8px 0; }
-  .fn-btn { display: inline-block; width: 22px; height: 22px; line-height: 22px; text-align: center; font-size: 11px; font-weight: 700; color: #fff; background: #555; border-radius: 3px; text-decoration: none; margin: 0 3px 3px 0; }
-  .fn-btn:hover { background: #333; }
+  .section-body .fn-ref { display: inline-block; min-width: 16px; height: 16px; line-height: 16px; text-align: center; font-size: 10px; font-weight: 700; color: #fff; background: #555; border-radius: 3px; text-decoration: none; padding: 0 3px; vertical-align: super; margin: 0 1px; }
+  .section-body .fn-ref:hover { background: #333; }
   .footnotes { padding: 12px 24px; border-top: 1px solid #eee; }
   .footnotes-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: #666; margin: 0 0 8px 0; }
   .footnotes ol { margin: 0; padding: 0 0 0 20px; }
@@ -45,35 +44,28 @@
   {% if digest.report.breaking_news %}
   <div class="section breaking">
     <p class="section-label">Breaking News</p>
-    <p class="section-body">{{ digest.report.breaking_news }}</p>
-    {% if digest.report.footnotes %}
-    <div class="fn-buttons">
-      {% for fn in digest.report.footnotes %}
-      <a class="fn-btn" href="{{ fn.url }}" title="{{ fn.title }}">{{ fn.index }}</a>
-      {% endfor %}
-    </div>
-    {% endif %}
+    <p class="section-body">{{ linkify_footnotes(digest.report.breaking_news, digest.report.footnotes) }}</p>
   </div>
   {% endif %}
 
   {% if digest.report.tech_stacks %}
   <div class="section stacks">
     <p class="section-label">Tech Stacks</p>
-    <p class="section-body">{{ digest.report.tech_stacks }}</p>
+    <p class="section-body">{{ linkify_footnotes(digest.report.tech_stacks, digest.report.footnotes) }}</p>
   </div>
   {% endif %}
 
   {% if digest.report.new_software %}
   <div class="section software">
     <p class="section-label">New Software</p>
-    <p class="section-body">{{ digest.report.new_software }}</p>
+    <p class="section-body">{{ linkify_footnotes(digest.report.new_software, digest.report.footnotes) }}</p>
   </div>
   {% endif %}
 
   {% if digest.report.deep_dives %}
   <div class="section dives">
     <p class="section-label">Deep Dives</p>
-    <p class="section-body">{{ digest.report.deep_dives }}</p>
+    <p class="section-body">{{ linkify_footnotes(digest.report.deep_dives, digest.report.footnotes) }}</p>
   </div>
   {% endif %}
 

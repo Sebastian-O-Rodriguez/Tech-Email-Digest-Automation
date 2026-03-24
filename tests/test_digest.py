@@ -8,13 +8,15 @@ from email_ingester.models import DigestReport, Email, Footnote
 
 def _make_report() -> DigestReport:
     return DigestReport(
-        breaking_news="Major outage on AWS.",
-        tech_stacks="React 20 ships server components.",
+        breaking_news="Major outage on AWS [1].",
+        tech_stacks="React 20 ships server components [2].",
         new_software="Cursor launched v2.",
         deep_dives="Great article on system design.",
         footnotes=[
             Footnote(index=1, title="AWS outage", url="https://example.com/outage"),
+            Footnote(index=2, title="React 20", url="https://example.com/react20"),
         ],
+        source_indices=[1],
     )
 
 
@@ -40,10 +42,10 @@ class TestGenerateDigest:
         assert "Deep Dives" in digest.html
         assert digest.total_processed == 5
 
-    def test_html_contains_footnote_buttons(self):
+    def test_html_contains_inline_footnote_links(self):
         report = _make_report()
         digest = generate_digest(report, total_processed=3, source_emails=[])
-        assert "fn-btn" in digest.html
+        assert "fn-ref" in digest.html
         assert "https://example.com/outage" in digest.html
 
     def test_html_contains_source_email_links(self):
@@ -53,6 +55,29 @@ class TestGenerateDigest:
         assert "Source Emails" in digest.html
         assert "outlook.office365.com" in digest.html
         assert "Test Subject" in digest.html
+
+    def test_source_emails_filtered_to_referenced_only(self):
+        report = DigestReport(
+            breaking_news="Test [1]",
+            tech_stacks="",
+            new_software="",
+            deep_dives="",
+            footnotes=[Footnote(index=1, title="T", url="https://x.com")],
+            source_indices=[2],
+        )
+        email1 = _make_email()
+        email2 = Email(
+            id="msg-002",
+            subject="Referenced Email",
+            sender="s@x.com",
+            timestamp=datetime(2026, 3, 23, tzinfo=UTC),
+            body_text="",
+            body_html="",
+            links=[],
+        )
+        digest = generate_digest(report, total_processed=2, source_emails=[email1, email2])
+        assert "Referenced Email" in digest.html
+        assert "Test Subject" not in digest.html
 
     def test_empty_report(self):
         report = DigestReport(

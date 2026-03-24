@@ -38,6 +38,7 @@ class DigestReport:
     new_software: str
     deep_dives: str
     footnotes: list[Footnote] = field(default_factory=list)
+    source_indices: list[int] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
