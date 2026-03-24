@@ -141,9 +141,9 @@ def generate_report(config: Config, client: openai.OpenAI, emails: list[Email]) 
         return _fallback_report(reason="json_parse_error")
 
     footnotes = []
-    for fn in data.get("footnotes", []):
+    for i, fn in enumerate(data.get("footnotes", []), 1):
         if isinstance(fn, dict) and fn.get("title") and fn.get("url"):
-            footnotes.append(Footnote(title=fn["title"], url=fn["url"]))
+            footnotes.append(Footnote(index=i, title=fn["title"], url=fn["url"]))
 
     return DigestReport(
         breaking_news=data.get("breaking_news", ""),

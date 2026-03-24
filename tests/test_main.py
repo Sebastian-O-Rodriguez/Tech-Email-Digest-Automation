@@ -66,6 +66,7 @@ _PATCHES = {
     "report": "email_ingester.main.generate_report",
     "digest": "email_ingester.main.generate_digest",
     "send": "email_ingester.main.send_digest",
+    "mark_read": "email_ingester.main.mark_as_read",
     "save_state": "email_ingester.main.save_state",
     "create_client": "email_ingester.main.create_client",
 }
@@ -88,6 +89,7 @@ class TestMainHappyPath:
             patch(_PATCHES["report"], return_value=_make_report()),
             patch(_PATCHES["digest"], return_value=digest),
             patch(_PATCHES["send"]) as mock_send,
+            patch(_PATCHES["mark_read"]),
             patch(_PATCHES["save_state"]) as mock_save,
             patch(_PATCHES["create_client"]),
         ):
@@ -114,6 +116,7 @@ class TestMainHappyPath:
             patch(_PATCHES["report"], return_value=_make_report()),
             patch(_PATCHES["digest"], return_value=digest),
             patch(_PATCHES["send"]) as mock_send,
+            patch(_PATCHES["mark_read"]),
             patch(_PATCHES["save_state"]),
             patch(_PATCHES["create_client"]),
         ):
@@ -123,6 +126,32 @@ class TestMainHappyPath:
 
         call_args = mock_send.call_args
         assert call_args[0][2] is digest
+
+    def test_happy_path_marks_emails_as_read(self, tmp_path: Path):
+        config = _make_config()
+        initial_state = State()
+        new_state = State(processed_ids={"msg-001"})
+        raw_email = _make_raw_email()
+        digest = _make_digest()
+
+        with (
+            patch(_PATCHES["config"], return_value=config),
+            patch(_PATCHES["token"], return_value="bearer-token"),
+            patch(_PATCHES["load_state"], return_value=initial_state),
+            patch(_PATCHES["fetch"], return_value=([raw_email], new_state)),
+            patch(_PATCHES["process"], return_value=raw_email),
+            patch(_PATCHES["report"], return_value=_make_report()),
+            patch(_PATCHES["digest"], return_value=digest),
+            patch(_PATCHES["send"]),
+            patch(_PATCHES["mark_read"]) as mock_mark,
+            patch(_PATCHES["save_state"]),
+            patch(_PATCHES["create_client"]),
+        ):
+            from email_ingester.main import main
+
+            main()
+
+        mock_mark.assert_called_once()
 
 
 class TestMainNoNewEmails:
@@ -140,6 +169,7 @@ class TestMainNoNewEmails:
             patch(_PATCHES["report"]) as mock_report,
             patch(_PATCHES["digest"]) as mock_digest,
             patch(_PATCHES["send"]) as mock_send,
+            patch(_PATCHES["mark_read"]) as mock_mark,
             patch(_PATCHES["save_state"]) as mock_save,
             patch(_PATCHES["create_client"]),
         ):
@@ -151,6 +181,7 @@ class TestMainNoNewEmails:
         mock_report.assert_not_called()
         mock_digest.assert_not_called()
         mock_send.assert_not_called()
+        mock_mark.assert_not_called()
         mock_save.assert_called_once()
 
     def test_no_emails_saves_updated_state(self):
@@ -164,6 +195,7 @@ class TestMainNoNewEmails:
             patch(_PATCHES["load_state"], return_value=initial_state),
             patch(_PATCHES["fetch"], return_value=([], new_state)),
             patch(_PATCHES["send"]),
+            patch(_PATCHES["mark_read"]),
             patch(_PATCHES["save_state"]) as mock_save,
             patch(_PATCHES["create_client"]),
         ):
@@ -192,6 +224,7 @@ class TestMainSendFailure:
             patch(_PATCHES["report"], return_value=_make_report()),
             patch(_PATCHES["digest"], return_value=digest),
             patch(_PATCHES["send"], side_effect=Exception("send failed")),
+            patch(_PATCHES["mark_read"]),
             patch(_PATCHES["save_state"]) as mock_save,
             patch(_PATCHES["create_client"]),
         ):
@@ -217,6 +250,7 @@ class TestMainSendFailure:
             patch(_PATCHES["report"], return_value=_make_report()),
             patch(_PATCHES["digest"], return_value=digest),
             patch(_PATCHES["send"], side_effect=Exception("network down")),
+            patch(_PATCHES["mark_read"]),
             patch(_PATCHES["save_state"]) as mock_save,
             patch(_PATCHES["create_client"]),
         ):

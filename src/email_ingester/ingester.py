@@ -257,3 +257,31 @@ def fetch_new_emails(config: Config, token: str, state: State) -> tuple[list[Ema
     )
 
     return emails, new_state
+
+
+def mark_as_read(config: Config, token: str, emails: list[Email]) -> None:
+    """Mark a list of emails as read via Graph API PATCH.
+
+    Failures are logged but do not raise, since marking as read is
+    best-effort and should never block the pipeline.
+    """
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json",
+    }
+    succeeded = 0
+    for email in emails:
+        url = f"{_GRAPH_BASE}/users/{config.mailbox_user_id}/messages/{email.id}"
+        try:
+            response = httpx.patch(url, headers=headers, json={"isRead": True}, timeout=10.0)
+            if response.is_success:
+                succeeded += 1
+            else:
+                logger.warning(
+                    "Failed to mark email %s as read: %d",
+                    email.id,
+                    response.status_code,
+                )
+        except (httpx.TimeoutException, httpx.NetworkError) as exc:
+            logger.warning("Network error marking email %s as read: %s", email.id, exc)
+    logger.info("Marked %d/%d emails as read", succeeded, len(emails))

@@ -1,7 +1,9 @@
 """Tests for digest generation."""
 
+from datetime import UTC, datetime
+
 from email_ingester.digest import generate_digest
-from email_ingester.models import DigestReport, Footnote
+from email_ingester.models import DigestReport, Email, Footnote
 
 
 def _make_report() -> DigestReport:
@@ -11,27 +13,46 @@ def _make_report() -> DigestReport:
         new_software="Cursor launched v2.",
         deep_dives="Great article on system design.",
         footnotes=[
-            Footnote(title="AWS outage", url="https://example.com/outage"),
+            Footnote(index=1, title="AWS outage", url="https://example.com/outage"),
         ],
+    )
+
+
+def _make_email() -> Email:
+    return Email(
+        id="msg-001",
+        subject="Test Subject",
+        sender="sender@example.com",
+        timestamp=datetime(2026, 3, 23, 10, 0, tzinfo=UTC),
+        body_text="Body text.",
+        body_html="",
+        links=[],
     )
 
 
 class TestGenerateDigest:
     def test_generates_html_with_sections(self):
         report = _make_report()
-        digest = generate_digest(report, total_processed=5)
-        assert "Guava AI" in digest.html
+        digest = generate_digest(report, total_processed=5, source_emails=[_make_email()])
         assert "Breaking News" in digest.html
         assert "Tech Stacks" in digest.html
         assert "New Software" in digest.html
         assert "Deep Dives" in digest.html
         assert digest.total_processed == 5
 
-    def test_html_contains_footnotes(self):
+    def test_html_contains_footnote_buttons(self):
         report = _make_report()
-        digest = generate_digest(report, total_processed=3)
-        assert "AWS outage" in digest.html
+        digest = generate_digest(report, total_processed=3, source_emails=[])
+        assert "fn-btn" in digest.html
         assert "https://example.com/outage" in digest.html
+
+    def test_html_contains_source_email_links(self):
+        report = _make_report()
+        email = _make_email()
+        digest = generate_digest(report, total_processed=1, source_emails=[email])
+        assert "Source Emails" in digest.html
+        assert "outlook.office365.com" in digest.html
+        assert "Test Subject" in digest.html
 
     def test_empty_report(self):
         report = DigestReport(
@@ -40,12 +61,10 @@ class TestGenerateDigest:
             new_software="",
             deep_dives="",
         )
-        digest = generate_digest(report, total_processed=0)
+        digest = generate_digest(report, total_processed=0, source_emails=[])
         assert digest.total_processed == 0
-        assert "Guava AI" in digest.html
 
     def test_report_data_preserved(self):
         report = _make_report()
-        digest = generate_digest(report, total_processed=10)
+        digest = generate_digest(report, total_processed=10, source_emails=[])
         assert digest.report is report
-        assert digest.report.breaking_news == "Major outage on AWS."

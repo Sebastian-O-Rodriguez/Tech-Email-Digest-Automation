@@ -24,6 +24,7 @@ class Email:
 class Footnote:
     """A key article reference for the digest footer."""
 
+    index: int
     title: str
     url: str
 
@@ -46,6 +47,7 @@ class DigestOutput:
     generated_at: datetime
     total_processed: int
     report: DigestReport
+    source_emails: list[Email] = field(default_factory=list)
     html: str = ""
 
 

@@ -12,7 +12,7 @@ from pathlib import Path
 from email_ingester.auth import get_graph_token
 from email_ingester.config import Config
 from email_ingester.digest import generate_digest
-from email_ingester.ingester import fetch_new_emails
+from email_ingester.ingester import fetch_new_emails, mark_as_read
 from email_ingester.processor import process_email
 from email_ingester.sender import send_digest
 from email_ingester.state import load_state, save_state
@@ -64,7 +64,11 @@ def main() -> None:
 
     # 7. Render digest HTML
     logger.info("Rendering digest")
-    digest = generate_digest(report, total_processed=len(processed_emails))
+    digest = generate_digest(
+        report,
+        total_processed=len(processed_emails),
+        source_emails=processed_emails,
+    )
 
     # 8. Send digest
     try:
@@ -73,7 +77,13 @@ def main() -> None:
     except Exception:
         logger.exception("Failed to send digest, state will still be saved")
 
-    # 9. Save state (always, even on send failure)
+    # 9. Mark digested emails as read
+    try:
+        mark_as_read(config, token, processed_emails)
+    except Exception:
+        logger.exception("Failed to mark emails as read")
+
+    # 10. Save state (always)
     save_state(state_path, new_state)
 
     logger.info("Pipeline complete")
