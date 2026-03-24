@@ -83,6 +83,48 @@ def _raise_for_graph_error(response: httpx.Response) -> None:
             )
 
 
+_WELL_KNOWN_FOLDERS = frozenset(
+    {
+        "inbox",
+        "drafts",
+        "sentitems",
+        "deleteditems",
+        "junkemail",
+        "archive",
+        "outbox",
+    }
+)
+
+
+def _resolve_folder_id(user_id: str, folder_name: str, headers: dict[str, str]) -> str:
+    """Resolve a folder display name to its Graph API folder ID.
+
+    Well-known folder names (inbox, drafts, etc.) are returned as-is since
+    Graph accepts them directly. Custom folder names require a lookup.
+    """
+    if folder_name.lower() in _WELL_KNOWN_FOLDERS:
+        return folder_name
+
+    url = (
+        f"{_GRAPH_BASE}/users/{user_id}/mailFolders"
+        f"?$filter=displayName eq '{folder_name}'"
+        f"&$select=id,displayName"
+    )
+    response = httpx.get(url, headers=headers, timeout=30.0)
+
+    if not response.is_success:
+        _raise_for_graph_error(response)
+
+    folders = response.json().get("value", [])
+    if not folders:
+        msg = f"Mail folder '{folder_name}' not found for user {user_id}"
+        raise GraphAPIError(msg, status_code=404, body="")
+
+    folder_id = folders[0]["id"]
+    logger.info("Resolved folder '%s' to ID '%s'.", folder_name, folder_id)
+    return folder_id
+
+
 def _parse_email(msg: dict) -> Email | None:
     """Parse a Graph API message object into an Email dataclass.
 
@@ -140,14 +182,17 @@ def fetch_new_emails(config: Config, token: str, state: State) -> tuple[list[Ema
         url: str | None = state.delta_token
         logger.info("Resuming delta query from stored delta token.")
     else:
-        folder = config.mailbox_folder
+        folder_id = _resolve_folder_id(config.mailbox_user_id, config.mailbox_folder, headers)
         url = (
             f"{_GRAPH_BASE}/users/{config.mailbox_user_id}"
-            f"/mailFolders/{folder}/messages/delta"
+            f"/mailFolders/{folder_id}/messages/delta"
             f"?$select=id,subject,from,receivedDateTime,body"
             f"&$top=50"
         )
-        logger.info("No delta token found — starting full delta sync for folder %r.", folder)
+        logger.info(
+            "No delta token found — starting full delta sync for folder %r.",
+            config.mailbox_folder,
+        )
 
     emails: list[Email] = []
     new_delta_token: str | None = state.delta_token
