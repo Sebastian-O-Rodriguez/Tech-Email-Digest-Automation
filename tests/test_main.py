@@ -126,7 +126,8 @@ class TestMainHappyPath:
             main()
 
         call_args = mock_send.call_args
-        assert call_args[0][2] is digest
+        sent_digest = call_args[0][2]
+        assert sent_digest.html == digest.html
 
     def test_happy_path_marks_emails_as_read(self, tmp_path: Path):
         config = _make_config()
