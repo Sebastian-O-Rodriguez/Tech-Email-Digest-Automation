@@ -2,15 +2,14 @@ name: Email Digest
 
 on:
   schedule:
-    # Fire 15 min early to prepare; send step waits until :30.
-    # 9:15 AM America/New_York (Mon-Fri)
-    - cron: '15 13 * * 1-5'   # 9:15 AM EDT
-    - cron: '15 14 * * 1-5'   # 9:15 AM EST
-    # 12:15 PM America/New_York (Mon-Fri)
-    - cron: '15 16 * * 1-5'   # 12:15 PM EDT
-    - cron: '15 17 * * 1-5'   # 12:15 PM EST
+    # 9:30 AM America/New_York (Mon-Fri)
+    - cron: '30 13 * * 1-5'   # 9:30 AM EDT (UTC-4)
+    - cron: '30 14 * * 1-5'   # 9:30 AM EST (UTC-5)
+    # 12:30 PM America/New_York (Mon-Fri)
+    - cron: '30 16 * * 1-5'   # 12:30 PM EDT (UTC-4)
+    - cron: '30 17 * * 1-5'   # 12:30 PM EST (UTC-5)
 
-  workflow_dispatch: {}  # Manual trigger (no wait)
+  workflow_dispatch: {}
 
 concurrency:
   group: email-digest
@@ -27,7 +26,7 @@ env:
 jobs:
   digest:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -40,29 +39,13 @@ jobs:
       - name: Install dependencies
         run: pip install .
 
-      # DST guard (schedule only): allow hours 09/10 (AM) and 12/13 (PM).
-      - name: DST guard
-        id: dst
-        if: github.event_name == 'schedule'
-        run: |
-          HOUR=$(TZ=America/New_York date +%H)
-          if [[ "$HOUR" == "09" || "$HOUR" == "10" || "$HOUR" == "12" || "$HOUR" == "13" ]]; then
-            echo "skip=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-            echo "Skipping: current hour in America/New_York is $HOUR"
-          fi
-
       - name: Restore state
-        if: steps.dst.outputs.skip != 'true'
         uses: actions/cache/restore@v4
         with:
           path: ${{ env.STATE_FILE }}
           key: digest-v17
 
-      # Phase 1: Fetch emails, process, generate report, save to file.
-      - name: Prepare digest
-        if: steps.dst.outputs.skip != 'true'
+      - name: Run digest pipeline
         env:
           AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
           AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
@@ -70,38 +53,10 @@ jobs:
           MAILBOX_USER: ${{ secrets.MAILBOX_USER }}
           TARGET_FOLDER_NAME: ${{ secrets.TARGET_FOLDER_NAME }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-        run: python -m email_ingester --prepare
-
-      # Phase 2: Wait until :30 so email arrives on time.
-      # Skipped for workflow_dispatch (manual triggers send immediately).
-      - name: Wait until send time
-        if: github.event_name == 'schedule' && steps.dst.outputs.skip != 'true'
-        run: |
-          while true; do
-            MIN=$(TZ=America/New_York date +%-M)
-            if [[ "$MIN" -ge 30 ]]; then
-              echo "Send time reached: $(TZ=America/New_York date +%H:%M)"
-              break
-            fi
-            REMAINING=$((30 - MIN))
-            echo "Waiting ${REMAINING}m... (currently :$(printf '%02d' $MIN))"
-            sleep 30
-          done
-
-      # Phase 3: Send the prepared digest and mark emails as read.
-      - name: Send digest
-        if: steps.dst.outputs.skip != 'true'
-        env:
-          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
-          MAILBOX_USER: ${{ secrets.MAILBOX_USER }}
-          TARGET_FOLDER_NAME: ${{ secrets.TARGET_FOLDER_NAME }}
-          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-        run: python -m email_ingester --send
+        run: python -m email_ingester
 
       - name: Save state
-        if: steps.dst.outputs.skip != 'true' && (success() || failure())
+        if: success() || failure()
         uses: actions/cache/save@v4
         with:
           path: ${{ env.STATE_FILE }}

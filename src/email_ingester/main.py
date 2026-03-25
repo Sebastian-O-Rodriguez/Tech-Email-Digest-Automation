@@ -1,14 +1,10 @@
 """Entry point for the email ingester pipeline.
 
-Usage:
-  python -m email_ingester              # Full run (prepare + send)
-  python -m email_ingester --prepare    # Prepare digest, save to file
-  python -m email_ingester --send       # Send prepared digest
+Usage: python -m email_ingester.main
 """
 
 from __future__ import annotations
 
-import json
 import logging
 import sys
 from pathlib import Path
@@ -29,11 +25,17 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 _BATCH_SIZE = 50
-_PREPARED_FILE = Path("prepared_digest.json")
 
 
-def _prepare(config: Config, token: str, state_path: Path) -> None:
-    """Fetch, process, generate report, save digest data to file."""
+def main() -> None:
+    """Run the full email digest pipeline."""
+    logger.info("Loading configuration")
+    config = Config.from_env()
+
+    logger.info("Authenticating to Microsoft Graph")
+    token = get_graph_token(config)
+
+    state_path = Path(config.state_file)
     state = load_state(state_path)
     logger.info("State loaded: %d previously processed emails", len(state.processed_ids))
 
@@ -53,101 +55,38 @@ def _prepare(config: Config, token: str, state_path: Path) -> None:
     all_processed = [process_email(e) for e in raw_emails]
 
     client = create_client(config)
-    digests_data = []
+    batch_count = 0
 
     for i in range(0, len(all_processed), _BATCH_SIZE):
         batch = all_processed[i : i + _BATCH_SIZE]
-        batch_num = i // _BATCH_SIZE + 1
+        batch_count += 1
         logger.info(
             "Batch %d: generating report from %d emails (of %d total)",
-            batch_num,
+            batch_count,
             len(batch),
             len(all_processed),
         )
+
         report = generate_report(config, client, batch)
-        digest = generate_digest(report, total_processed=len(batch), source_emails=batch)
-        digests_data.append(
-            {
-                "html": digest.html,
-                "generated_at": digest.generated_at.isoformat(),
-                "email_ids": [e.id for e in batch],
-            }
+        digest = generate_digest(
+            report,
+            total_processed=len(batch),
+            source_emails=batch,
         )
 
-    prepared = {
-        "digests": digests_data,
-        "all_email_ids": [e.id for e in all_processed],
-    }
-    _PREPARED_FILE.write_text(json.dumps(prepared), encoding="utf-8")
-    logger.info("Prepared %d digest(s), saved to %s", len(digests_data), _PREPARED_FILE)
-
-    save_state(state_path, new_state)
-
-
-def _send(config: Config, token: str) -> None:
-    """Send prepared digest(s) and mark emails as read."""
-    if not _PREPARED_FILE.exists():
-        logger.info("No prepared digest found, nothing to send")
-        return
-
-    prepared = json.loads(_PREPARED_FILE.read_text(encoding="utf-8"))
-    digests = prepared["digests"]
-    all_ids = prepared["all_email_ids"]
-
-    from datetime import UTC, datetime
-
-    from email_ingester.models import DigestOutput, DigestReport, Email
-
-    for i, d in enumerate(digests, 1):
-        dummy_report = DigestReport(
-            breaking_news="", tech_stacks="", new_software="", deep_dives=""
-        )
-        digest = DigestOutput(
-            generated_at=datetime.fromisoformat(d["generated_at"]),
-            total_processed=0,
-            report=dummy_report,
-            html=d["html"],
-        )
         try:
-            logger.info("Sending digest %d/%d", i, len(digests))
+            logger.info("Batch %d: sending digest", batch_count)
             send_digest(config, token, digest)
         except Exception:
-            logger.exception("Failed to send digest %d", i)
+            logger.exception("Batch %d: failed to send digest", batch_count)
 
-    # Mark all as read using minimal Email objects
-    emails_to_mark = [
-        Email(
-            id=eid, subject="", sender="", timestamp=datetime.now(UTC), body_text="", body_html=""
-        )
-        for eid in all_ids
-    ]
     try:
-        mark_as_read(config, token, emails_to_mark)
+        mark_as_read(config, token, all_processed)
     except Exception:
         logger.exception("Failed to mark emails as read")
 
-    _PREPARED_FILE.unlink(missing_ok=True)
-    logger.info("Send complete")
-
-
-def main() -> None:
-    """Run the full email digest pipeline."""
-    config = Config.from_env()
-    token = get_graph_token(config)
-    state_path = Path(config.state_file)
-
-    mode = sys.argv[1] if len(sys.argv) > 1 else None
-
-    if mode == "--prepare":
-        logger.info("Mode: prepare only")
-        _prepare(config, token, state_path)
-    elif mode == "--send":
-        logger.info("Mode: send only")
-        _send(config, token)
-    else:
-        logger.info("Mode: full run")
-        _prepare(config, token, state_path)
-        _send(config, token)
+    save_state(state_path, new_state)
+    logger.info("Pipeline complete: %d batches, %d emails", batch_count, len(all_processed))
 
 
 if __name__ == "__main__":
