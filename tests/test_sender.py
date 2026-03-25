@@ -23,7 +23,6 @@ def _make_config() -> Config:
         openrouter_api_key="sk-test",
         llm_model="claude-sonnet-4-6-20250514",
         digest_recipient="recipient@example.com",
-        state_file="state.json",
     )
 
 

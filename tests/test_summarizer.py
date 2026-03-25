@@ -23,7 +23,6 @@ def config() -> Config:
         openrouter_api_key="test-key",
         llm_model="anthropic/claude-sonnet-4",
         digest_recipient="user@example.com",
-        state_file="state.json",
     )
 
 

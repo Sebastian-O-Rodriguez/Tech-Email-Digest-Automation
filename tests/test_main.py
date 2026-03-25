@@ -19,7 +19,6 @@ def _make_config() -> Config:
         openrouter_api_key="sk-test",
         llm_model="test-model",
         digest_recipient="recipient@example.com",
-        state_file="state.json",
     )
 
 

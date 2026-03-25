@@ -24,9 +24,6 @@ class Config:
     # Digest
     digest_recipient: str
 
-    # State
-    state_file: str
-
     @classmethod
     def from_env(cls) -> Config:
         """Load configuration from environment variables. Raises if required vars are missing."""
@@ -49,5 +46,4 @@ class Config:
             openrouter_api_key=require("OPENROUTER_API_KEY"),
             llm_model=os.environ.get("LLM_MODEL", "anthropic/claude-sonnet-4"),
             digest_recipient=os.environ.get("DIGEST_RECIPIENT", mailbox_user_id),
-            state_file=os.environ.get("STATE_FILE", "state.json"),
         )

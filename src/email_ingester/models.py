@@ -40,17 +40,3 @@ class DigestOutput:
     report: DigestReport
     source_emails: list[Email] = field(default_factory=list)
     html: str = ""
-
-
-@dataclass
-class State:
-    """Persistent state between runs.
-
-    Note: ``processed_ids`` is a set for O(1) lookup during deduplication.
-    Sets are not JSON-serializable -- the ``state.py`` module handles
-    conversion (set <-> sorted list) during load/save.
-    """
-
-    delta_token: str | None = None
-    processed_ids: set[str] = field(default_factory=set)
-    last_run: str | None = None  # ISO 8601 timestamp
