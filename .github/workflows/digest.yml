@@ -18,7 +18,6 @@ permissions:
 
 env:
   PYTHON_VERSION: '3.12'
-  STATE_FILE: state.json
   TZ: America/New_York
 
 jobs:
@@ -37,14 +36,6 @@ jobs:
       - name: Install dependencies
         run: pip install .
 
-      - name: Restore state
-        uses: actions/cache/restore@v4
-        with:
-          path: ${{ env.STATE_FILE }}
-          key: digest-state-${{ github.run_id }}
-          restore-keys: |
-            digest-state-
-
       - name: Run digest pipeline
         env:
           AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
@@ -54,10 +45,3 @@ jobs:
           TARGET_FOLDER_NAME: ${{ secrets.TARGET_FOLDER_NAME }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
         run: python -m email_ingester
-
-      - name: Save state
-        if: success() || failure()
-        uses: actions/cache/save@v4
-        with:
-          path: ${{ env.STATE_FILE }}
-          key: digest-state-${{ github.run_id }}
