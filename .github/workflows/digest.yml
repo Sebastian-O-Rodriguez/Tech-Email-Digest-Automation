@@ -2,17 +2,17 @@ name: Email Digest
 
 on:
   schedule:
-    # 6:00 AM America/New_York
-    # EST (Nov-Mar): UTC-5 -> 11:00 UTC
-    # EDT (Mar-Nov): UTC-4 -> 10:00 UTC
-    - cron: '0 10 * * *'   # 6 AM EDT
-    - cron: '0 11 * * *'   # 6 AM EST
+    # 9:30 AM America/New_York (Mon-Fri)
+    # EDT (Mar-Nov): UTC-4 -> 13:30 UTC
+    # EST (Nov-Mar): UTC-5 -> 14:30 UTC
+    - cron: '30 13 * * 1-5'   # 9:30 AM EDT
+    - cron: '30 14 * * 1-5'   # 9:30 AM EST
 
-    # 5:00 PM America/New_York
-    # EST (Nov-Mar): UTC-5 -> 22:00 UTC
-    # EDT (Mar-Nov): UTC-4 -> 21:00 UTC
-    - cron: '0 21 * * *'   # 5 PM EDT
-    - cron: '0 22 * * *'   # 5 PM EST
+    # 12:30 PM America/New_York (Mon-Fri)
+    # EDT (Mar-Nov): UTC-4 -> 16:30 UTC
+    # EST (Nov-Mar): UTC-5 -> 17:30 UTC
+    - cron: '30 16 * * 1-5'   # 12:30 PM EDT
+    - cron: '30 17 * * 1-5'   # 12:30 PM EST
 
   workflow_dispatch: {}  # Manual trigger for testing
 
@@ -44,15 +44,24 @@ jobs:
       - name: Install dependencies
         run: pip install .
 
-      # DST guard: skip if this cron fired outside the target hour.
+      # DST guard: skip if this cron fired outside the target half-hours.
       # During DST transitions, both cron times fire but only one is correct.
       - name: DST guard
         id: dst
         run: |
           HOUR=$(TZ=America/New_York date +%H)
-          if [[ "$HOUR" != "06" && "$HOUR" != "17" ]]; then
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-            echo "Skipping: current hour in America/New_York is $HOUR (not 06 or 17)"
+          MIN=$(TZ=America/New_York date +%M)
+          HHMM="${HOUR}${MIN}"
+          if [[ "$HHMM" != "0930" && "$HHMM" != "1230" ]]; then
+            # Allow a 5-minute window for GH Actions cron drift
+            if [[ "$HOUR" == "09" && "$MIN" -ge 25 && "$MIN" -le 35 ]]; then
+              echo "skip=false" >> "$GITHUB_OUTPUT"
+            elif [[ "$HOUR" == "12" && "$MIN" -ge 25 && "$MIN" -le 35 ]]; then
+              echo "skip=false" >> "$GITHUB_OUTPUT"
+            else
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+              echo "Skipping: current time in America/New_York is ${HOUR}:${MIN}"
+            fi
           else
             echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
@@ -73,8 +82,6 @@ jobs:
           MAILBOX_USER: ${{ secrets.MAILBOX_USER }}
           TARGET_FOLDER_NAME: ${{ secrets.TARGET_FOLDER_NAME }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-          # DIGEST_RECIPIENT defaults to MAILBOX_USER_ID if not set.
-          # Add DIGEST_RECIPIENT secret if sending to a different address.
         run: python -m email_ingester
 
       - name: Save state

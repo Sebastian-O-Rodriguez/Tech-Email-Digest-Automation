@@ -47,7 +47,8 @@ def generate_digest(
         ],
     )
 
-    html = template.render(digest=digest, citations=citations)
+    edition = "AM" if digest.generated_at.hour < 16 else "PM"
+    html = template.render(digest=digest, citations=citations, edition=edition)
 
     return DigestOutput(
         generated_at=digest.generated_at,
