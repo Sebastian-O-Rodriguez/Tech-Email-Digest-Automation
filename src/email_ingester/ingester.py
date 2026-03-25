@@ -259,6 +259,66 @@ def fetch_new_emails(config: Config, token: str, state: State) -> tuple[list[Ema
     return emails, new_state
 
 
+def fetch_unread_emails(config: Config, token: str, state: State) -> tuple[list[Email], State]:
+    """Fetch unread emails using the regular messages endpoint (not delta).
+
+    Used as a fallback when the delta query returns 0 but unread emails
+    still exist in the folder. Skips already-processed IDs.
+    """
+    headers = {"Authorization": f"Bearer {token}"}
+    folder_id = _resolve_folder_id(config.mailbox_user_id, config.mailbox_folder, headers)
+
+    url: str | None = (
+        f"{_GRAPH_BASE}/users/{config.mailbox_user_id}"
+        f"/mailFolders/{folder_id}/messages"
+        f"?$filter=isRead eq false"
+        f"&$select=id,subject,from,receivedDateTime,body"
+        f"&$top=200"
+        f"&$orderby=receivedDateTime desc"
+    )
+    logger.info("Fetching unread emails from folder (non-delta fallback).")
+
+    emails: list[Email] = []
+    page_number = 0
+
+    while url:
+        page_number += 1
+        logger.info("Fetching unread page %d...", page_number)
+
+        response = httpx.get(url, headers=headers, timeout=60.0)
+        if not response.is_success:
+            _raise_for_graph_error(response)
+
+        data = response.json()
+        messages = data.get("value", [])
+        logger.info("Page %d: received %d unread message(s).", page_number, len(messages))
+
+        for msg in messages:
+            msg_id = msg.get("id", "")
+            if msg_id and msg_id in state.processed_ids:
+                continue
+            parsed = _parse_email(msg)
+            if parsed is not None:
+                emails.append(parsed)
+
+        url = data.get("@odata.nextLink")
+
+    logger.info(
+        "Unread fetch complete. %d new message(s) across %d page(s).",
+        len(emails),
+        page_number,
+    )
+
+    new_processed_ids = state.processed_ids | {e.id for e in emails}
+    new_state = State(
+        delta_token=state.delta_token,
+        processed_ids=new_processed_ids,
+        last_run=datetime.now(UTC).isoformat(),
+    )
+
+    return emails, new_state
+
+
 def mark_as_read(config: Config, token: str, emails: list[Email]) -> None:
     """Mark a list of emails as read via Graph API PATCH.
 

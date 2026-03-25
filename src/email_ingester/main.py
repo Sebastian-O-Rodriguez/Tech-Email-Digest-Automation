@@ -12,7 +12,7 @@ from pathlib import Path
 from email_ingester.auth import get_graph_token
 from email_ingester.config import Config
 from email_ingester.digest import generate_digest
-from email_ingester.ingester import fetch_new_emails, mark_as_read
+from email_ingester.ingester import fetch_new_emails, fetch_unread_emails, mark_as_read
 from email_ingester.processor import process_email
 from email_ingester.sender import send_digest
 from email_ingester.state import load_state, save_state
@@ -51,9 +51,12 @@ def main() -> None:
     logger.info("Fetched %d new emails", len(raw_emails))
 
     if not raw_emails:
-        logger.info("No new emails, skipping digest generation")
-        save_state(state_path, new_state)
-        return
+        logger.info("Delta returned 0, checking for unread emails (fallback)")
+        raw_emails, new_state = fetch_unread_emails(config, token, new_state)
+        if not raw_emails:
+            logger.info("No unread emails either, skipping digest generation")
+            save_state(state_path, new_state)
+            return
 
     # 5. Process all (normalize + extract links)
     logger.info("Processing emails")
