@@ -24,6 +24,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+_BATCH_SIZE = 50
+
 
 def main() -> None:
     """Run the full email digest pipeline."""
@@ -53,40 +55,48 @@ def main() -> None:
         save_state(state_path, new_state)
         return
 
-    # 5. Process (normalize + extract links)
+    # 5. Process all (normalize + extract links)
     logger.info("Processing emails")
-    processed_emails = [process_email(e) for e in raw_emails]
+    all_processed = [process_email(e) for e in raw_emails]
 
-    # 6. Generate aggregated report via LLM
-    logger.info("Generating report from %d emails via LLM", len(processed_emails))
+    # 6. Process in batches of _BATCH_SIZE
     client = create_client(config)
-    report = generate_report(config, client, processed_emails)
+    batch_count = 0
 
-    # 7. Render digest HTML
-    logger.info("Rendering digest")
-    digest = generate_digest(
-        report,
-        total_processed=len(processed_emails),
-        source_emails=processed_emails,
-    )
+    for i in range(0, len(all_processed), _BATCH_SIZE):
+        batch = all_processed[i : i + _BATCH_SIZE]
+        batch_count += 1
+        logger.info(
+            "Batch %d: generating report from %d emails (of %d total)",
+            batch_count,
+            len(batch),
+            len(all_processed),
+        )
 
-    # 8. Send digest
+        report = generate_report(config, client, batch)
+
+        digest = generate_digest(
+            report,
+            total_processed=len(batch),
+            source_emails=batch,
+        )
+
+        try:
+            logger.info("Batch %d: sending digest", batch_count)
+            send_digest(config, token, digest)
+        except Exception:
+            logger.exception("Batch %d: failed to send digest", batch_count)
+
+    # 7. Mark all digested emails as read
     try:
-        logger.info("Sending digest to %s", config.digest_recipient)
-        send_digest(config, token, digest)
-    except Exception:
-        logger.exception("Failed to send digest, state will still be saved")
-
-    # 9. Mark digested emails as read
-    try:
-        mark_as_read(config, token, processed_emails)
+        mark_as_read(config, token, all_processed)
     except Exception:
         logger.exception("Failed to mark emails as read")
 
-    # 10. Save state (always)
+    # 8. Save state (always)
     save_state(state_path, new_state)
 
-    logger.info("Pipeline complete")
+    logger.info("Pipeline complete: %d batches, %d emails", batch_count, len(all_processed))
 
 
 if __name__ == "__main__":

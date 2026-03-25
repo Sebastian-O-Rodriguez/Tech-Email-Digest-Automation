@@ -187,7 +187,6 @@ def fetch_new_emails(config: Config, token: str, state: State) -> tuple[list[Ema
             f"{_GRAPH_BASE}/users/{config.mailbox_user_id}"
             f"/mailFolders/{folder_id}/messages/delta"
             f"?$select=id,subject,from,receivedDateTime,body"
-            f"&$top=50"
         )
         logger.info(
             "No delta token found — starting full delta sync for folder %r.",
