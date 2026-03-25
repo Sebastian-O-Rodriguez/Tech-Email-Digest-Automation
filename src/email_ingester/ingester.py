@@ -187,6 +187,7 @@ def fetch_new_emails(config: Config, token: str, state: State) -> tuple[list[Ema
             f"{_GRAPH_BASE}/users/{config.mailbox_user_id}"
             f"/mailFolders/{folder_id}/messages/delta"
             f"?$select=id,subject,from,receivedDateTime,body"
+            f"&$top=200"
         )
         logger.info(
             "No delta token found — starting full delta sync for folder %r.",
@@ -201,7 +202,7 @@ def fetch_new_emails(config: Config, token: str, state: State) -> tuple[list[Ema
         page_number += 1
         logger.info("Fetching page %d from Graph API...", page_number)
 
-        response = httpx.get(url, headers=headers, timeout=30.0)
+        response = httpx.get(url, headers=headers, timeout=60.0)
 
         if not response.is_success:
             _raise_for_graph_error(response)
