@@ -15,16 +15,10 @@
   .software .section-label { color: #27ae60; border-color: #27ae60; }
   .dives .section-label { color: #8e44ad; border-color: #8e44ad; }
   .section-body { font-size: 13px; line-height: 1.5; color: #333; margin: 0 0 8px 0; }
-  .section-body .src-ref { font-size: 10px; font-weight: 700; color: #2980b9; text-decoration: none; vertical-align: super; }
-  .section-body .src-ref:hover { text-decoration: underline; }
-  .sources { padding: 12px 24px; border-top: 1px solid #eee; }
-  .sources-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: #666; margin: 0 0 8px 0; }
-  .sources ul { margin: 0; padding: 0; list-style: none; }
-  .sources li { font-size: 11px; line-height: 1.8; }
-  .sources .num { font-weight: 700; color: #2980b9; }
-  .sources a { color: #2980b9; text-decoration: none; }
-  .sources a:hover { text-decoration: underline; }
-  .sources .sender { color: #999; }
+  .citations { padding: 12px 24px; border-top: 1px solid #eee; }
+  .citations-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: #666; margin: 0 0 8px 0; }
+  .citations ul { margin: 0; padding: 0; list-style: none; }
+  .citations li { font-size: 11px; line-height: 1.6; color: #666; font-style: italic; }
   .footer { padding: 12px 24px; text-align: center; font-size: 11px; color: #bbb; border-top: 1px solid #eee; }
 </style>
 </head>
@@ -39,37 +33,37 @@
   {% if digest.report.breaking_news %}
   <div class="section breaking">
     <p class="section-label">Breaking News</p>
-    <p class="section-body">{{ linkify_sources(digest.report.breaking_news) }}</p>
+    <p class="section-body">{{ digest.report.breaking_news }}</p>
   </div>
   {% endif %}
 
   {% if digest.report.tech_stacks %}
   <div class="section stacks">
     <p class="section-label">Tech Stacks</p>
-    <p class="section-body">{{ linkify_sources(digest.report.tech_stacks) }}</p>
+    <p class="section-body">{{ digest.report.tech_stacks }}</p>
   </div>
   {% endif %}
 
   {% if digest.report.new_software %}
   <div class="section software">
     <p class="section-label">New Software</p>
-    <p class="section-body">{{ linkify_sources(digest.report.new_software) }}</p>
+    <p class="section-body">{{ digest.report.new_software }}</p>
   </div>
   {% endif %}
 
   {% if digest.report.deep_dives %}
   <div class="section dives">
     <p class="section-label">Deep Dives</p>
-    <p class="section-body">{{ linkify_sources(digest.report.deep_dives) }}</p>
+    <p class="section-body">{{ digest.report.deep_dives }}</p>
   </div>
   {% endif %}
 
-  {% if referenced %}
-  <div class="sources">
-    <p class="sources-label">Sources</p>
+  {% if citations %}
+  <div class="citations">
+    <p class="citations-label">Works Cited</p>
     <ul>
-      {% for idx, email in referenced %}
-      <li><span class="num">[{{ idx }}]</span> <a href="{{ outlook_url(email.id) }}">{{ email.subject | truncate(50) }}</a> <span class="sender">{{ email.sender }}</span></li>
+      {% for cite in citations %}
+      <li>{{ cite }}</li>
       {% endfor %}
     </ul>
   </div>

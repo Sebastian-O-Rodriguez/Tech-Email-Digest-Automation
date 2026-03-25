@@ -44,9 +44,8 @@ Rules:
 - Total report must be under 1500 characters.
 - Write in dense, telegraphic style. No full sentences. Use semicolons to \
 separate items within a section. Pack maximum information per character.
-- After each claim, put the source email number in brackets. These numbers \
-match the input email numbers [1], [2], etc. The reader can click these to \
-open the original email.
+- After each claim, cite the source email number in brackets. These numbers \
+match the input email numbers [1], [2], etc.
 - Example: "Deno 2.1 drops Node compat layer [4]; Bun adds S3 native \
 client [7]; Cloudflare Workers now supports Python 3.12 [12]."
 - Never use em dashes.

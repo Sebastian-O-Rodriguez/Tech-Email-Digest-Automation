@@ -47,21 +47,22 @@ class TestGenerateDigest:
         assert "Tech Stacks" in digest.html
         assert digest.total_processed == 5
 
-    def test_inline_refs_link_to_outlook(self):
+    def test_mla_citations_in_works_cited(self):
         report = _make_report()
         digest = generate_digest(report, total_processed=2, source_emails=_make_emails())
-        assert "src-ref" in digest.html
-        assert "outlook.office365.com" in digest.html
-
-    def test_sources_section_shows_referenced_emails(self):
-        report = _make_report()
-        emails = _make_emails()
-        digest = generate_digest(report, total_processed=2, source_emails=emails)
-        assert "Sources" in digest.html
+        assert "Works Cited" in digest.html
+        assert "alerts@example.com" in digest.html
         assert "AWS Outage Alert" in digest.html
-        assert "React 20 Released" in digest.html
+        assert "23 Mar. 2026" in digest.html
 
-    def test_only_referenced_emails_in_sources(self):
+    def test_inline_refs_are_plain_text(self):
+        report = _make_report()
+        digest = generate_digest(report, total_processed=2, source_emails=_make_emails())
+        assert "[1]" in digest.html
+        assert "src-ref" not in digest.html
+        assert "fn-ref" not in digest.html
+
+    def test_only_referenced_emails_cited(self):
         report = DigestReport(
             breaking_news="Test [2]",
             tech_stacks="",
