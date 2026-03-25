@@ -279,8 +279,9 @@ def fetch_unread_emails(config: Config, token: str, state: State) -> tuple[list[
     url: str | None = (
         f"{_GRAPH_BASE}/users/{config.mailbox_user_id}"
         f"/mailFolders/{folder_id}/messages"
-        f"?$select=id,subject,from,receivedDateTime,body"
-        f"&$top=1"
+        f"?$filter=isRead eq false"
+        f"&$select=id,subject,from,receivedDateTime,body"
+        f"&$top=200"
         f"&$orderby=receivedDateTime desc"
     )
     logger.info("Fetching unread emails from folder (non-delta fallback).")

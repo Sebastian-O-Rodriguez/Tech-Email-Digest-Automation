@@ -67,14 +67,14 @@ jobs:
           fi
 
       - name: Restore state
-        if: true
+        if: steps.dst.outputs.skip != 'true'
         uses: actions/cache/restore@v4
         with:
           path: ${{ env.STATE_FILE }}
-          key: digest-test-v2
+          key: digest-v17
 
       - name: Run digest pipeline
-        if: true
+        if: steps.dst.outputs.skip != 'true'
         env:
           AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
           AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
@@ -85,8 +85,8 @@ jobs:
         run: python -m email_ingester
 
       - name: Save state
-        if: true && (success() || failure())
+        if: steps.dst.outputs.skip != 'true' && (success() || failure())
         uses: actions/cache/save@v4
         with:
           path: ${{ env.STATE_FILE }}
-          key: digest-test-v2
+          key: digest-v17

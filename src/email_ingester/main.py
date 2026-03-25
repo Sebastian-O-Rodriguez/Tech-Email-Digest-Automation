@@ -45,15 +45,18 @@ def main() -> None:
         len(state.processed_ids),
     )
 
-    # 4. Fetch new emails (TEST: skip delta, use fallback for 10 most recent)
-    logger.info("Fetching most recent emails from folder: %s", config.mailbox_folder)
-    raw_emails, new_state = fetch_unread_emails(config, token, state)
-    logger.info("Fetched %d emails", len(raw_emails))
+    # 4. Fetch new emails
+    logger.info("Fetching new emails from folder: %s", config.mailbox_folder)
+    raw_emails, new_state = fetch_new_emails(config, token, state)
+    logger.info("Fetched %d new emails", len(raw_emails))
 
     if not raw_emails:
-        logger.info("No emails found, skipping digest generation")
-        save_state(state_path, new_state)
-        return
+        logger.info("Delta returned 0, checking for unread emails (fallback)")
+        raw_emails, new_state = fetch_unread_emails(config, token, new_state)
+        if not raw_emails:
+            logger.info("No unread emails either, skipping digest generation")
+            save_state(state_path, new_state)
+            return
 
     # 5. Process all (normalize + extract links)
     logger.info("Processing emails")
