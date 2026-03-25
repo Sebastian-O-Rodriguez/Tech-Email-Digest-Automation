@@ -204,6 +204,14 @@ def fetch_new_emails(config: Config, token: str, state: State) -> tuple[list[Ema
 
         response = httpx.get(url, headers=headers, timeout=60.0)
 
+        if response.status_code == 410:
+            logger.warning("Delta token expired (410 Gone). Returning empty for fallback.")
+            return [], State(
+                delta_token=None,
+                processed_ids=state.processed_ids,
+                last_run=datetime.now(UTC).isoformat(),
+            )
+
         if not response.is_success:
             _raise_for_graph_error(response)
 
