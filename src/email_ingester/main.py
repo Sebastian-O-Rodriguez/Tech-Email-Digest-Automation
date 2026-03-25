@@ -24,7 +24,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-_BATCH_SIZE = 50
+_MAX_DIGEST_EMAILS = 50
 
 
 def main() -> None:
@@ -51,34 +51,31 @@ def main() -> None:
             save_state(state_path, new_state)
             return
 
-    logger.info("Processing emails")
+    logger.info("Processing %d emails", len(raw_emails))
     all_processed = [process_email(e) for e in raw_emails]
 
+    # Only digest the most recent _MAX_DIGEST_EMAILS.
+    # State is saved for ALL fetched emails so they won't be re-fetched.
+    digest_batch = all_processed[:_MAX_DIGEST_EMAILS]
+    logger.info(
+        "Generating digest from %d emails (of %d total fetched)",
+        len(digest_batch),
+        len(all_processed),
+    )
+
     client = create_client(config)
-    batch_count = 0
+    report = generate_report(config, client, digest_batch)
+    digest = generate_digest(
+        report,
+        total_processed=len(digest_batch),
+        source_emails=digest_batch,
+    )
 
-    for i in range(0, len(all_processed), _BATCH_SIZE):
-        batch = all_processed[i : i + _BATCH_SIZE]
-        batch_count += 1
-        logger.info(
-            "Batch %d: generating report from %d emails (of %d total)",
-            batch_count,
-            len(batch),
-            len(all_processed),
-        )
-
-        report = generate_report(config, client, batch)
-        digest = generate_digest(
-            report,
-            total_processed=len(batch),
-            source_emails=batch,
-        )
-
-        try:
-            logger.info("Batch %d: sending digest", batch_count)
-            send_digest(config, token, digest)
-        except Exception:
-            logger.exception("Batch %d: failed to send digest", batch_count)
+    try:
+        logger.info("Sending digest")
+        send_digest(config, token, digest)
+    except Exception:
+        logger.exception("Failed to send digest")
 
     try:
         mark_as_read(config, token, all_processed)
@@ -86,7 +83,9 @@ def main() -> None:
         logger.exception("Failed to mark emails as read")
 
     save_state(state_path, new_state)
-    logger.info("Pipeline complete: %d batches, %d emails", batch_count, len(all_processed))
+    logger.info(
+        "Pipeline complete: digested %d, total processed %d", len(digest_batch), len(all_processed)
+    )
 
 
 if __name__ == "__main__":
