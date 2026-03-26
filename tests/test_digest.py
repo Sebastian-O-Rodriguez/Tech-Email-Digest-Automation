@@ -8,10 +8,10 @@ from email_ingester.models import DigestReport, Email
 
 def _make_report() -> DigestReport:
     return DigestReport(
-        breaking_news="Major outage on AWS [1].",
-        tech_stacks="React 20 ships server components [2].",
-        new_software="Cursor launched v2.",
-        deep_dives="Great article on system design.",
+        strategic_intel="Major outage on AWS [1].",
+        engineering="React 20 ships server components [2].",
+        tools_and_ops="Cursor launched v2.",
+        radar="Great article on system design.",
         source_indices=[1, 2],
     )
 
@@ -43,8 +43,8 @@ class TestGenerateDigest:
     def test_generates_html_with_sections(self):
         report = _make_report()
         digest = generate_digest(report, total_processed=5, source_emails=_make_emails())
-        assert "Breaking News" in digest.html
-        assert "Tech Stacks" in digest.html
+        assert "Strategic Intel" in digest.html
+        assert "Engineering" in digest.html
         assert digest.total_processed == 5
 
     def test_mla_citations_in_works_cited(self):
@@ -64,10 +64,10 @@ class TestGenerateDigest:
 
     def test_only_referenced_emails_cited(self):
         report = DigestReport(
-            breaking_news="Test [2]",
-            tech_stacks="",
-            new_software="",
-            deep_dives="",
+            strategic_intel="Test [2]",
+            engineering="",
+            tools_and_ops="",
+            radar="",
             source_indices=[2],
         )
         emails = _make_emails()
@@ -77,10 +77,10 @@ class TestGenerateDigest:
 
     def test_empty_report(self):
         report = DigestReport(
-            breaking_news="",
-            tech_stacks="",
-            new_software="",
-            deep_dives="",
+            strategic_intel="",
+            engineering="",
+            tools_and_ops="",
+            radar="",
         )
         digest = generate_digest(report, total_processed=0, source_emails=[])
         assert digest.total_processed == 0

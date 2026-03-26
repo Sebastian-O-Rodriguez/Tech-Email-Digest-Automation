@@ -63,10 +63,10 @@ def _make_mock_response(text: str) -> MagicMock:
 def _valid_report_json() -> str:
     return json.dumps(
         {
-            "breaking_news": "AWS us-east-1 experienced a major outage [1].",
-            "tech_stacks": "React 20 ships server components by default [2].",
-            "new_software": "No notable releases this cycle.",
-            "deep_dives": "No deep dives worth flagging.",
+            "strategic_intel": "AWS us-east-1 experienced a major outage [1].",
+            "engineering": "React 20 ships server components by default [2].",
+            "tools_and_ops": "No notable releases this cycle.",
+            "radar": "No deep dives worth flagging.",
             "sources": [1, 2],
         }
     )
@@ -80,8 +80,8 @@ class TestGenerateReport:
         result = generate_report(config, client, sample_emails)
 
         assert isinstance(result, DigestReport)
-        assert "outage" in result.breaking_news.lower()
-        assert "react" in result.tech_stacks.lower()
+        assert "outage" in result.strategic_intel.lower()
+        assert "react" in result.engineering.lower()
         assert result.source_indices == [1, 2]
 
     def test_api_error_returns_fallback(self, config: Config, sample_emails: list[Email]):
@@ -95,14 +95,14 @@ class TestGenerateReport:
         result = generate_report(config, client, sample_emails)
 
         assert isinstance(result, DigestReport)
-        assert "failed" in result.breaking_news.lower()
+        assert "failed" in result.strategic_intel.lower()
 
     def test_json_parse_error_returns_fallback(self, config: Config, sample_emails: list[Email]):
         client = MagicMock(spec=openai.OpenAI)
         client.chat.completions.create.return_value = _make_mock_response("not json {{")
 
         result = generate_report(config, client, sample_emails)
-        assert "failed" in result.breaking_news.lower()
+        assert "failed" in result.strategic_intel.lower()
 
     def test_empty_choices_returns_fallback(self, config: Config, sample_emails: list[Email]):
         client = MagicMock(spec=openai.OpenAI)
@@ -111,23 +111,23 @@ class TestGenerateReport:
         client.chat.completions.create.return_value = response
 
         result = generate_report(config, client, sample_emails)
-        assert "failed" in result.breaking_news.lower()
+        assert "failed" in result.strategic_intel.lower()
 
     def test_blank_response_returns_fallback(self, config: Config, sample_emails: list[Email]):
         client = MagicMock(spec=openai.OpenAI)
         client.chat.completions.create.return_value = _make_mock_response("   ")
 
         result = generate_report(config, client, sample_emails)
-        assert "failed" in result.breaking_news.lower()
+        assert "failed" in result.strategic_intel.lower()
 
     def test_non_int_sources_skipped(self, config: Config, sample_emails: list[Email]):
         client = MagicMock(spec=openai.OpenAI)
         data = json.dumps(
             {
-                "breaking_news": "Test [1]",
-                "tech_stacks": "",
-                "new_software": "",
-                "deep_dives": "",
+                "strategic_intel": "Test [1]",
+                "engineering": "",
+                "tools_and_ops": "",
+                "radar": "",
                 "sources": [1, "bad", None, 2],
             }
         )

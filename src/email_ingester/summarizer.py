@@ -22,10 +22,10 @@ logger = logging.getLogger(__name__)
 _OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
 _SYSTEM_PROMPT = """\
-You are an intelligence analyst for Guava AI, a software company. You produce \
-a concise daily brief from a batch of newsletter emails. Your reader is a \
-technical leader who needs to stay current on backend, frontend, design, dev \
-tooling, B2B software, and AI/ML.
+You are an intelligence analyst for Guava AI, a software company building AI \
+products. You produce a daily brief from newsletter emails. Each section targets \
+a different executive audience. Only surface things that MOVE THE NEEDLE. Skip \
+routine updates. Focus on what changes decisions.
 
 The emails below are numbered [1], [2], etc. Read them all and produce ONE \
 aggregated JSON report. Do not summarize each email individually. Synthesize \
@@ -33,12 +33,30 @@ and group the information.
 
 Respond with ONLY valid JSON in this exact format:
 {
-  "breaking_news": "**Key term** short point [1]\\n**Key term** short point [3]",
-  "tech_stacks": "**Key term** short point [2]\\n**Key term** short point [5]",
-  "new_software": "**Key term** short point [4]",
-  "deep_dives": "**Key term** short point [6]",
+  "strategic_intel": "**Key term** point [1]\\n**Key term** point [3]",
+  "engineering": "**Key term** point [2]\\n**Key term** point [5]",
+  "tools_and_ops": "**Key term** point [4]",
+  "radar": "**Key term** point [6]",
   "sources": [1, 2, 3, 4, 5, 6]
 }
+
+Section audiences and framing:
+
+STRATEGIC INTEL (CEO frame): Major industry shifts, funding rounds, \
+acquisitions, regulation, AI policy. Frame each bullet as: why does this \
+matter for a company building AI products? What changes about our market, \
+hiring, or product direction?
+
+ENGINEERING (CTO frame): Frameworks, languages, infrastructure, architecture \
+changes. Frame each bullet as: should we consider adopting this? What's the \
+risk/reward for our stack? Is this production-ready or experimental?
+
+TOOLS & OPS (COO frame): New dev tools, design tools, B2B software, workflow \
+improvements. Frame each bullet as: will this make us ship faster, design \
+better, or operate more efficiently?
+
+RADAR (catch-all): Notable signals that don't fit above but still matter. \
+Emerging trends, surprising data points, cultural shifts in tech.
 
 Rules:
 - Each section contains bullet points separated by \\n (newline).
@@ -46,16 +64,13 @@ Rules:
 a short description (under 80 chars per bullet), then source ref [n].
 - 3-5 bullets per section. No more.
 - Total report must be under 2000 characters.
+- Only include items that change decisions or signal real shifts. Skip \
+routine version bumps, minor updates, and "nice to know" items.
 - Never use em dashes.
 - Never use semicolons to join items. One item per line.
-- Never start bullets with "Notable:", "Key:", or similar labels.
+- Never start bullets with labels like "Notable:", "Key:", "Update:".
 - sources: list ALL input email numbers you referenced.
 - If a section has nothing, write "Nothing notable this cycle."
-
-Example section value:
-"**Deno 2.1** drops Node compat layer entirely [4]\\n**Bun** adds native S3 \
-client for direct uploads [7]\\n**Cloudflare Workers** now supports Python 3.12 \
-runtime [12]"
 """
 
 
@@ -63,10 +78,10 @@ def _fallback_report(reason: str) -> DigestReport:
     """Return a safe fallback report when the LLM call fails."""
     logger.warning("Using fallback report: %s", reason)
     return DigestReport(
-        breaking_news="Report generation failed. Check logs for details.",
-        tech_stacks="",
-        new_software="",
-        deep_dives="",
+        strategic_intel="Report generation failed. Check logs for details.",
+        engineering="",
+        tools_and_ops="",
+        radar="",
     )
 
 
@@ -144,9 +159,9 @@ def generate_report(config: Config, client: openai.OpenAI, emails: list[Email]) 
             source_indices.append(idx)
 
     return DigestReport(
-        breaking_news=data.get("breaking_news", ""),
-        tech_stacks=data.get("tech_stacks", ""),
-        new_software=data.get("new_software", ""),
-        deep_dives=data.get("deep_dives", ""),
+        strategic_intel=data.get("strategic_intel", ""),
+        engineering=data.get("engineering", ""),
+        tools_and_ops=data.get("tools_and_ops", ""),
+        radar=data.get("radar", ""),
         source_indices=source_indices,
     )

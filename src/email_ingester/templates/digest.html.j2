@@ -59,10 +59,17 @@
     margin: 0 0 12px 0;
     line-height: 1.3;
   }
-  .breaking h2 { color: #dc2626; }
-  .stacks h2 { color: #2563eb; }
-  .software h2 { color: #16a34a; }
-  .dives h2 { color: #7c3aed; }
+  .strategic h2 { color: #dc2626; }
+  .engineering h2 { color: #2563eb; }
+  .tools h2 { color: #16a34a; }
+  .radar h2 { color: #7c3aed; }
+  .section .audience {
+    font-size: 12px;
+    font-weight: 400;
+    color: #9ca3af;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
 
   /* Bullet lists */
   .section-list {
@@ -136,31 +143,31 @@
     <p class="meta">{{ digest.generated_at.strftime('%A, %B %d %Y') }} | {{ digest.total_processed }} source{{ 's' if digest.total_processed != 1 else '' }} analyzed</p>
   </div>
 
-  {% if digest.report.breaking_news %}
-  <div class="section breaking">
-    <h2>Breaking News</h2>
-    {{ render_section(digest.report.breaking_news) }}
+  {% if digest.report.strategic_intel %}
+  <div class="section strategic">
+    <h2>Strategic Intel <span class="audience">CEO</span></h2>
+    {{ render_section(digest.report.strategic_intel) }}
   </div>
   {% endif %}
 
-  {% if digest.report.tech_stacks %}
-  <div class="section stacks">
-    <h2>Tech Stacks</h2>
-    {{ render_section(digest.report.tech_stacks) }}
+  {% if digest.report.engineering %}
+  <div class="section engineering">
+    <h2>Engineering <span class="audience">CTO</span></h2>
+    {{ render_section(digest.report.engineering) }}
   </div>
   {% endif %}
 
-  {% if digest.report.new_software %}
-  <div class="section software">
-    <h2>New Software</h2>
-    {{ render_section(digest.report.new_software) }}
+  {% if digest.report.tools_and_ops %}
+  <div class="section tools">
+    <h2>Tools & Ops <span class="audience">COO</span></h2>
+    {{ render_section(digest.report.tools_and_ops) }}
   </div>
   {% endif %}
 
-  {% if digest.report.deep_dives %}
-  <div class="section dives">
-    <h2>Deep Dives</h2>
-    {{ render_section(digest.report.deep_dives) }}
+  {% if digest.report.radar %}
+  <div class="section radar">
+    <h2>On the Radar</h2>
+    {{ render_section(digest.report.radar) }}
   </div>
   {% endif %}
 

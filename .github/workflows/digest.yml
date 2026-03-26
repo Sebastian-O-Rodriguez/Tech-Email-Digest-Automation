@@ -4,8 +4,6 @@ on:
   schedule:
     # 9:30 AM EDT / 8:30 AM EST (Mon-Fri)
     - cron: '30 13 * * 1-5'
-    # 12:30 PM EDT / 11:30 AM EST (Mon-Fri)
-    - cron: '30 16 * * 1-5'
 
   workflow_dispatch: {}
 

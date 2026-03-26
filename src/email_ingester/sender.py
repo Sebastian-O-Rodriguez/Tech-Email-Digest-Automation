@@ -36,10 +36,8 @@ def send_digest(config: Config, token: str, digest: DigestOutput) -> None:
         "Content-Type": "application/json",
     }
 
-    # AM edition runs ~9:30 ET (13:30-14:30 UTC), PM runs ~12:30 ET (16:30-17:30 UTC)
-    edition = "AM" if digest.generated_at.hour < 16 else "PM"
     day_str = digest.generated_at.strftime("%a %d %b")
-    subject = f"{edition} Digest, {day_str}"
+    subject = f"Daily Digest, {day_str}"
 
     payload = {
         "message": {

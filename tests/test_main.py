@@ -36,10 +36,10 @@ def _make_email() -> Email:
 
 def _make_report() -> DigestReport:
     return DigestReport(
-        breaking_news="Test breaking news.",
-        tech_stacks="Test stacks.",
-        new_software="Test software.",
-        deep_dives="Test dives.",
+        strategic_intel="Test breaking news.",
+        engineering="Test stacks.",
+        tools_and_ops="Test software.",
+        radar="Test dives.",
     )
 
 
