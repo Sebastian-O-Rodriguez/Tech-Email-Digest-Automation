@@ -40,11 +40,13 @@ def _make_httpx_response(
     status_code: int = 200,
     content_type: str = "text/html; charset=utf-8",
     text: str = "<html><head><title>Article</title></head><body><p>Body text.</p></body></html>",
+    url: str = "https://example.com/article",
 ) -> MagicMock:
     response = MagicMock()
     response.status_code = status_code
     response.headers = {"content-type": content_type}
     response.text = text
+    response.url = url
     return response
 
 

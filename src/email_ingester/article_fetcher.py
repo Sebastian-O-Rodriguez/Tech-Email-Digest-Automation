@@ -6,7 +6,7 @@ import base64
 import json
 import logging
 import re
-from urllib.parse import urlparse
+from urllib.parse import unquote, urlparse
 
 import httpx
 from bs4 import BeautifulSoup
@@ -92,8 +92,9 @@ def filter_links(urls: list[str]) -> list[str]:
         if url.startswith("#") or url.startswith("mailto:"):
             continue
 
-        # Resolve newsletter redirects to real destination URLs
-        resolved = _resolve_redirect(url)
+        # Unwrap tracking URLs, then resolve newsletter redirects
+        unwrapped = _unwrap_tracking_url(url)
+        resolved = _resolve_redirect(unwrapped)
 
         if _is_skippable(resolved):
             logger.debug("filter_links: skipping %s", resolved[:100])
@@ -157,6 +158,36 @@ def extract_article_text(html: str) -> tuple[str, str]:
     return (title, clean_text)
 
 
+def _unwrap_tracking_url(url: str) -> str:
+    """Extract the real destination from newsletter tracking wrappers.
+
+    Many newsletters (TLDR, Morning Brew, etc.) wrap links like:
+      tracking.tldrnewsletter.com/CL0/https:%2F%2Fexample.com%2Farticle/1/...
+    The real URL is percent-encoded in the path after /CL0/.
+    """
+    parsed = urlparse(url)
+    path = parsed.path
+
+    # Pattern: /CL0/<encoded-url>/<number>/...
+    match = re.match(r"/CL0/(https?(?:%3A|:).*?)(?:/\d+/|$)", path)
+    if match:
+        dest = unquote(match.group(1))
+        if dest.startswith("http"):
+            logger.debug("_unwrap_tracking_url: %s -> %s", url[:80], dest[:80])
+            return dest
+
+    return url
+
+
+def _normalize_url(url: str) -> str:
+    """Strip tracking params and fragments to get a canonical URL for dedup."""
+    parsed = urlparse(url)
+    # Remove common tracking query params
+    clean = f"{parsed.scheme}://{parsed.netloc}{parsed.path}"
+    # Strip trailing slashes for consistency
+    return clean.rstrip("/")
+
+
 def _resolve_substack_redirect(url: str) -> str | None:
     """Extract the real destination URL from a Substack redirect link.
 
@@ -211,18 +242,32 @@ def fetch_articles(emails: list[Email]) -> list[ArticleContent]:
     - Skips non-HTML responses, paywalled content, and empty extractions.
     - Best-effort: exceptions per URL are logged and skipped.
     """
-    # Collect (url, email_index) pairs, preserving first-seen email for dupes
-    seen_urls: set[str] = set()
-    candidates: list[tuple[str, int]] = []
+    # Collect (url, email_index) pairs per email, dedup on normalized URL
+    seen_normalized: set[str] = set()
+    per_email: dict[int, list[tuple[str, int]]] = {}
 
     for idx, email in enumerate(emails, start=1):
+        per_email[idx] = []
         for url in filter_links(email.links):
-            if url not in seen_urls:
-                seen_urls.add(url)
-                candidates.append((url, idx))
+            norm = _normalize_url(url)
+            if norm not in seen_normalized:
+                seen_normalized.add(norm)
+                per_email[idx].append((url, idx))
 
-    # Cap at 10 total
-    candidates = candidates[:10]
+    # Distribute slots across emails round-robin to avoid one email hogging all 10
+    max_articles = 10
+    candidates: list[tuple[str, int]] = []
+    email_indices = [idx for idx in per_email if per_email[idx]]
+    round_idx = 0
+    while len(candidates) < max_articles and email_indices:
+        next_round: list[int] = []
+        for idx in email_indices:
+            if round_idx < len(per_email[idx]) and len(candidates) < max_articles:
+                candidates.append(per_email[idx][round_idx])
+            if round_idx + 1 < len(per_email[idx]):
+                next_round.append(idx)
+        email_indices = next_round
+        round_idx += 1
 
     if not candidates:
         logger.info("fetch_articles: no fetchable links found")
@@ -270,15 +315,17 @@ def fetch_articles(emails: list[Email]) -> list[ArticleContent]:
             logger.debug("fetch_articles: empty extraction for %s, skipping", url)
             continue
 
+        # Use the final URL after redirects for clean hyperlinks
+        final_url = str(response.url)
         articles.append(
             ArticleContent(
-                url=url,
+                url=final_url,
                 title=title,
                 text=text,
                 email_index=email_index,
             )
         )
-        logger.info("fetch_articles: extracted article from %s (email %d)", url, email_index)
+        logger.info("fetch_articles: extracted article from %s (email %d)", final_url, email_index)
 
     logger.info("fetch_articles: returned %d articles", len(articles))
     return articles
