@@ -5,31 +5,121 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Guava AI Digest</title>
 <style>
-  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; margin: 0; padding: 0; background: #f6f9fc; color: #1a1a1a; -webkit-font-smoothing: antialiased; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    background: #f6f9fc;
+    color: #1a1a1a;
+    -webkit-font-smoothing: antialiased;
+  }
   .wrapper { padding: 40px 20px; }
-  .container { max-width: 560px; margin: 0 auto; background: #ffffff; border-radius: 12px; border: 1px solid #e8e8e8; overflow: hidden; }
+  .container {
+    max-width: 600px;
+    margin: 0 auto;
+    background: #ffffff;
+    border-radius: 12px;
+    border: 1px solid #e8e8e8;
+    overflow: hidden;
+  }
+
+  /* Brand */
   .brand { padding: 32px 32px 0 32px; }
-  .brand-mark { font-size: 13px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: #16a34a; margin: 0; }
-  .header { padding: 12px 32px 24px 32px; border-bottom: 1px solid #eaeaea; }
-  .header h1 { margin: 0 0 4px 0; font-size: 22px; font-weight: 700; color: #111; letter-spacing: -0.3px; }
-  .header .meta { font-size: 12px; color: #8c8c8c; margin: 0; }
-  .section { padding: 20px 32px 8px 32px; }
-  .section-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin: 0 0 8px 0; padding: 4px 8px; border-radius: 4px; display: inline-block; }
-  .breaking .section-label { color: #dc2626; background: #fef2f2; }
-  .stacks .section-label { color: #2563eb; background: #eff6ff; }
-  .software .section-label { color: #16a34a; background: #f0fdf4; }
-  .dives .section-label { color: #7c3aed; background: #f5f3ff; }
-  .section-body { font-size: 14px; line-height: 1.6; color: #374151; margin: 8px 0 0 0; }
-  .divider { border: none; border-top: 1px solid #eaeaea; margin: 0; }
-  .citations { padding: 20px 32px; }
-  .citations-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #8c8c8c; margin: 0 0 10px 0; cursor: pointer; list-style: none; }
+  .brand-mark {
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    color: #16a34a;
+    margin: 0;
+  }
+
+  /* Header */
+  .header { padding: 8px 32px 28px 32px; border-bottom: 1px solid #eaeaea; }
+  .header h1 {
+    margin: 0 0 6px 0;
+    font-size: 26px;
+    font-weight: 700;
+    color: #111;
+    letter-spacing: -0.3px;
+    line-height: 1.3;
+  }
+  .header .meta {
+    font-size: 14px;
+    color: #8c8c8c;
+    margin: 0;
+    line-height: 1.4;
+  }
+
+  /* Sections */
+  .section { padding: 28px 32px 12px 32px; }
+  .section h2 {
+    font-size: 18px;
+    font-weight: 600;
+    margin: 0 0 12px 0;
+    line-height: 1.3;
+  }
+  .breaking h2 { color: #dc2626; }
+  .stacks h2 { color: #2563eb; }
+  .software h2 { color: #16a34a; }
+  .dives h2 { color: #7c3aed; }
+
+  /* Bullet lists */
+  .section-list {
+    margin: 0;
+    padding: 0 0 0 20px;
+    list-style: disc;
+  }
+  .section-list li {
+    font-size: 16px;
+    line-height: 1.7;
+    color: #374151;
+    margin-bottom: 8px;
+  }
+  .section-list li strong {
+    font-weight: 600;
+    color: #111;
+  }
+  .section-empty {
+    font-size: 16px;
+    line-height: 1.7;
+    color: #9ca3af;
+    margin: 0;
+  }
+
+  /* Divider */
+  .divider { border: none; border-top: 1px solid #eaeaea; margin: 16px 0 0 0; }
+
+  /* Citations */
+  .citations { padding: 24px 32px; }
+  .citations-label {
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #8c8c8c;
+    margin: 0 0 12px 0;
+    cursor: pointer;
+    list-style: none;
+  }
   .citations-label::-webkit-details-marker { display: none; }
-  .citations-label::before { content: '\25B6  '; font-size: 9px; }
+  .citations-label::before { content: '\25B6  '; font-size: 10px; }
   details[open] > .citations-label::before { content: '\25BC  '; }
   .citations ul { margin: 0; padding: 0; list-style: none; }
-  .citations li { font-size: 12px; line-height: 1.7; color: #6b7280; }
-  .footer { padding: 20px 32px; text-align: center; border-top: 1px solid #eaeaea; }
-  .footer p { margin: 0; font-size: 11px; color: #a3a3a3; }
+  .citations li {
+    font-size: 13px;
+    line-height: 1.7;
+    color: #6b7280;
+    margin-bottom: 4px;
+  }
+
+  /* Footer */
+  .footer {
+    padding: 24px 32px;
+    text-align: center;
+    border-top: 1px solid #eaeaea;
+  }
+  .footer p { margin: 0; font-size: 12px; color: #a3a3a3; }
   .footer .brand-footer { font-weight: 700; color: #16a34a; letter-spacing: 0.5px; }
 </style>
 </head>
@@ -48,29 +138,29 @@
 
   {% if digest.report.breaking_news %}
   <div class="section breaking">
-    <p class="section-label">Breaking News</p>
-    <p class="section-body">{{ digest.report.breaking_news }}</p>
+    <h2>Breaking News</h2>
+    {{ render_section(digest.report.breaking_news) }}
   </div>
   {% endif %}
 
   {% if digest.report.tech_stacks %}
   <div class="section stacks">
-    <p class="section-label">Tech Stacks</p>
-    <p class="section-body">{{ digest.report.tech_stacks }}</p>
+    <h2>Tech Stacks</h2>
+    {{ render_section(digest.report.tech_stacks) }}
   </div>
   {% endif %}
 
   {% if digest.report.new_software %}
   <div class="section software">
-    <p class="section-label">New Software</p>
-    <p class="section-body">{{ digest.report.new_software }}</p>
+    <h2>New Software</h2>
+    {{ render_section(digest.report.new_software) }}
   </div>
   {% endif %}
 
   {% if digest.report.deep_dives %}
   <div class="section dives">
-    <p class="section-label">Deep Dives</p>
-    <p class="section-body">{{ digest.report.deep_dives }}</p>
+    <h2>Deep Dives</h2>
+    {{ render_section(digest.report.deep_dives) }}
   </div>
   {% endif %}
 

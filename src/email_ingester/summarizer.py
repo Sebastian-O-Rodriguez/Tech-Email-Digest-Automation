@@ -33,25 +33,29 @@ and group the information.
 
 Respond with ONLY valid JSON in this exact format:
 {
-  "breaking_news": "Dense notes with source refs like [1] [3]",
-  "tech_stacks": "Dense notes with source refs like [2] [5]",
-  "new_software": "Dense notes with source refs",
-  "deep_dives": "Dense notes with source refs",
-  "sources": [1, 3, 5, 12]
+  "breaking_news": "**Key term** short point [1]\\n**Key term** short point [3]",
+  "tech_stacks": "**Key term** short point [2]\\n**Key term** short point [5]",
+  "new_software": "**Key term** short point [4]",
+  "deep_dives": "**Key term** short point [6]",
+  "sources": [1, 2, 3, 4, 5, 6]
 }
 
 Rules:
-- Total report must be under 1500 characters.
-- Write in dense, telegraphic style. No full sentences. Use semicolons to \
-separate items within a section. Pack maximum information per character.
-- After each claim, cite the source email number in brackets. These numbers \
-match the input email numbers [1], [2], etc.
-- Example: "Deno 2.1 drops Node compat layer [4]; Bun adds S3 native \
-client [7]; Cloudflare Workers now supports Python 3.12 [12]."
+- Each section contains bullet points separated by \\n (newline).
+- Each bullet is ONE line: bold the key term with **double asterisks**, then \
+a short description (under 80 chars per bullet), then source ref [n].
+- 3-5 bullets per section. No more.
+- Total report must be under 2000 characters.
 - Never use em dashes.
-- Never start items with "Notable:" or "Key:" or similar labels.
-- sources: list ALL input email numbers you referenced in the report.
+- Never use semicolons to join items. One item per line.
+- Never start bullets with "Notable:", "Key:", or similar labels.
+- sources: list ALL input email numbers you referenced.
 - If a section has nothing, write "Nothing notable this cycle."
+
+Example section value:
+"**Deno 2.1** drops Node compat layer entirely [4]\\n**Bun** adds native S3 \
+client for direct uploads [7]\\n**Cloudflare Workers** now supports Python 3.12 \
+runtime [12]"
 """
 
 
