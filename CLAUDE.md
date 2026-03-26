@@ -1,6 +1,6 @@
 # Email Ingester — Guava AI Daily Digest
 
-> Automated system that ingests unread emails from an Outlook folder, synthesizes an aggregated intelligence brief via LLM, and delivers it as a polished HTML digest. Twice daily, Mon-Fri. No UI. No interaction. Just open and read.
+> Automated system that ingests unread emails from an Outlook folder, synthesizes an executive-framed intelligence brief via LLM, and delivers it as a polished HTML digest. Once daily, Mon-Fri at 9:30 AM ET. No UI. No interaction. Just open and read.
 
 ---
 
@@ -11,7 +11,7 @@
 | Language | Python 3.12+ |
 | Email API | Microsoft Graph API (client credentials flow) |
 | LLM | OpenRouter (openai SDK) |
-| Scheduling | GitHub Actions cron (twice daily, Mon-Fri) |
+| Scheduling | GitHub Actions cron (once daily, Mon-Fri) |
 | Templates | Jinja2 (HTML digest) |
 | Linting | ruff |
 | Testing | pytest |
@@ -44,10 +44,10 @@ Email:
   links: list[str]           # Extracted URLs
 
 DigestReport:
-  breaking_news: str         # Aggregated section content
-  tech_stacks: str
-  new_software: str
-  deep_dives: str
+  strategic_intel: str       # CEO-framed section (bullet points)
+  engineering: str           # CTO-framed section
+  tools_and_ops: str         # COO-framed section
+  radar: str                 # Catch-all notable signals
   source_indices: list[int]  # Which input emails were referenced
 
 DigestOutput:
@@ -69,10 +69,25 @@ Each run executes exactly these steps:
 3. Fetch all unread emails from target folder (`isRead eq false`)
 4. Normalize content (HTML to text, extract links)
 5. Send all emails to LLM in one call, get aggregated report back
-6. Render HTML digest from Jinja2 template with MLA citations
+6. Render HTML digest with executive-framed sections and MLA citations
 7. Send digest email via Graph API
 8. Mark all processed emails as read
 9. Exit cleanly
+
+---
+
+## Digest Sections
+
+| Section | Audience | Frame |
+|---------|----------|-------|
+| Strategic Intel | CEO | Market shifts, why it matters for AI companies |
+| Engineering | CTO | Stack decisions, adopt/avoid signals |
+| Tools & Ops | COO | Workflow improvements, ship-faster tools |
+| On the Radar | General | Notable signals that don't fit above |
+
+LLM outputs bullet points with **bold key terms** and [n] source refs.
+Template renders as proper `<ul>` lists with 16px body text.
+Works Cited section uses MLA-style citations in a collapsible dropdown.
 
 ---
 
@@ -87,7 +102,6 @@ Each run executes exactly these steps:
 - Multi-user support
 - Email reply or automation
 - Thread reconstruction
-- Advanced NLP classification
 - Cloud infrastructure beyond GitHub Actions
 - Per-email summarization (we aggregate)
 - State files or caching (read/unread is the state)
@@ -123,3 +137,12 @@ python -m pytest
 ```
 
 Run all: `./scripts/quality-gate.sh all`
+
+---
+
+## Next Up: Article Fetcher
+
+Planned feature to enrich the LLM context by following links from emails
+and fetching actual article content (not just newsletter summaries).
+
+See `.gorp/plans/current-sprint.md` for the implementation plan.
