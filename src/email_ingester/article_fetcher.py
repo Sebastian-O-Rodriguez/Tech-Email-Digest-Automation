@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import base64
+import json
 import logging
 import re
 from urllib.parse import urlparse
@@ -150,6 +152,50 @@ def extract_article_text(html: str) -> tuple[str, str]:
     return (title, clean_text)
 
 
+def _resolve_substack_redirect(url: str) -> str | None:
+    """Extract the real destination URL from a Substack redirect link.
+
+    Substack uses two redirect formats:
+    1. /redirect/2/<base64-jwt> — the JWT payload has an "e" field with the URL
+    2. /redirect/<uuid>?j=<base64> — opaque; we can't extract the URL, skip it
+
+    Returns the destination URL for format 1, or None if not resolvable.
+    """
+    parsed = urlparse(url)
+    if "substack.com" not in parsed.netloc:
+        return None
+
+    path_parts = parsed.path.strip("/").split("/")
+    # Format: /redirect/2/<jwt-like-token>
+    if len(path_parts) == 3 and path_parts[0] == "redirect" and path_parts[1] == "2":
+        token = path_parts[2]
+        # JWT has 3 dot-separated parts; the payload is the second
+        jwt_parts = token.split(".")
+        if len(jwt_parts) >= 2:
+            try:
+                # Add padding for base64url decoding
+                payload = jwt_parts[1]
+                payload += "=" * (4 - len(payload) % 4)
+                decoded = base64.urlsafe_b64decode(payload)
+                data = json.loads(decoded)
+                dest = data.get("e")
+                if dest and dest.startswith("http"):
+                    logger.debug("_resolve_substack_redirect: %s -> %s", url[:80], dest)
+                    return dest
+            except Exception:
+                logger.debug("_resolve_substack_redirect: failed to decode JWT for %s", url[:80])
+    return None
+
+
+def _resolve_redirect(url: str) -> str:
+    """Resolve newsletter redirect URLs to their real destinations.
+
+    Currently handles Substack redirects. Falls back to the original URL.
+    """
+    resolved = _resolve_substack_redirect(url)
+    return resolved if resolved else url
+
+
 def fetch_articles(emails: list[Email]) -> list[ArticleContent]:
     """Fetch article content for links found across all emails.
 
@@ -182,7 +228,8 @@ def fetch_articles(emails: list[Email]) -> list[ArticleContent]:
     articles: list[ArticleContent] = []
     headers = {"User-Agent": _USER_AGENT}
 
-    for url, email_index in candidates:
+    for raw_url, email_index in candidates:
+        url = _resolve_redirect(raw_url)
         try:
             response = httpx.get(
                 url,
