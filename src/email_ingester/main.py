@@ -58,6 +58,7 @@ def main() -> None:
         report,
         total_processed=len(processed),
         source_emails=processed,
+        articles=articles,
     )
 
     try:

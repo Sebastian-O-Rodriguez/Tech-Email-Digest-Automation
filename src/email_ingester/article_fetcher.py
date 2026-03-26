@@ -23,6 +23,8 @@ _SKIP_DOMAINS = frozenset(
         "youtube.com",
         "reddit.com",
         "substack.com",
+        "tldr.tech",
+        "tldrnewsletter.com",
     ]
 )
 
@@ -38,6 +40,11 @@ _SKIP_PATTERNS = [
     r"click\.\w+\.\w+",
     r"list-manage\.com",
     r"mailchimp\.com",
+    # Advertiser / sponsor pages
+    r"advertise\.",
+    r"/sponsored",
+    # Newsletter web-version links
+    r"a\.tldrnewsletter\.com/web-version",
 ]
 
 _PAYWALL_PHRASES = [

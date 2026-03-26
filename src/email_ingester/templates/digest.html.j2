@@ -178,7 +178,7 @@
       <summary class="citations-label">Works Cited</summary>
       <ul>
         {% for cite in citations %}
-        <li>{{ cite }}</li>
+        <li>{{ cite | safe }}</li>
         {% endfor %}
       </ul>
     </details>
