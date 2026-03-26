@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 
 import openai
 
-from email_ingester.models import DigestReport, Email  # noqa: TC001
+from email_ingester.models import ArticleContent, DigestReport, Email  # noqa: TC001
 
 if TYPE_CHECKING:
     from email_ingester.config import Config
@@ -63,7 +63,9 @@ Rules:
 - Each bullet is ONE line: bold the key term with **double asterisks**, then \
 a short description (under 80 chars per bullet), then source ref [n].
 - 3-5 bullets per section. No more.
-- Total report must be under 2000 characters.
+- The four sections (strategic_intel, engineering, tools_and_ops, radar) must \
+total under 2000 characters combined. The sources array does not count toward \
+this limit.
 - Only include items that change decisions or signal real shifts. Skip \
 routine version bumps, minor updates, and "nice to know" items.
 - Never use em dashes.
@@ -93,26 +95,41 @@ def create_client(config: Config) -> openai.OpenAI:
     )
 
 
-def _format_emails_for_llm(emails: list[Email]) -> str:
+def _format_emails_for_llm(
+    emails: list[Email], articles: list[ArticleContent] | None = None
+) -> str:
     """Format all emails into a condensed feed for the LLM.
 
     Each email is trimmed to subject, sender, and first 300 chars of body
     plus up to 5 links. This keeps the total prompt manageable even for
-    50+ emails.
+    50+ emails. When articles are provided, they are appended after the
+    Links line grouped by email index.
     """
+    # Group articles by 1-based email index for O(1) lookup per email
+    articles_by_index: dict[int, list[ArticleContent]] = {}
+    if articles:
+        for article in articles:
+            articles_by_index.setdefault(article.email_index, []).append(article)
+
     parts = []
     for i, email in enumerate(emails, 1):
         links_str = " | ".join(email.links[:5]) if email.links else "(none)"
         body_preview = email.body_text[:300].replace("\n", " ").strip()
-        parts.append(
-            f"[{i}] {email.subject}\nFrom: {email.sender}\n{body_preview}\nLinks: {links_str}"
-        )
+        entry = f"[{i}] {email.subject}\nFrom: {email.sender}\n{body_preview}\nLinks: {links_str}"
+        for article in articles_by_index.get(i, []):
+            entry += f'\nArticle: "{article.title}" \u2013 {article.text}'
+        parts.append(entry)
     return "\n\n".join(parts)
 
 
-def generate_report(config: Config, client: openai.OpenAI, emails: list[Email]) -> DigestReport:
+def generate_report(
+    config: Config,
+    client: openai.OpenAI,
+    emails: list[Email],
+    articles: list[ArticleContent] | None = None,
+) -> DigestReport:
     """Send all emails to the LLM in one call and get an aggregated report back."""
-    user_content = _format_emails_for_llm(emails)
+    user_content = _format_emails_for_llm(emails, articles)
     logger.info("LLM prompt size: %d chars for %d emails", len(user_content), len(emails))
 
     try:

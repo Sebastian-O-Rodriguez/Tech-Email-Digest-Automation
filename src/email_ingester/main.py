@@ -10,6 +10,7 @@ from __future__ import annotations
 import logging
 import sys
 
+from email_ingester.article_fetcher import fetch_articles
 from email_ingester.auth import get_graph_token
 from email_ingester.config import Config
 from email_ingester.digest import generate_digest
@@ -44,9 +45,13 @@ def main() -> None:
     logger.info("Processing %d emails", len(raw_emails))
     processed = [process_email(e) for e in raw_emails]
 
+    logger.info("Fetching article content from links")
+    articles = fetch_articles(processed)
+    logger.info("Fetched %d articles", len(articles))
+
     logger.info("Generating report via LLM")
     client = create_client(config)
-    report = generate_report(config, client, processed)
+    report = generate_report(config, client, processed, articles)
 
     logger.info("Rendering digest")
     digest = generate_digest(
