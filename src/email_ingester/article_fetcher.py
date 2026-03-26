@@ -22,6 +22,7 @@ _SKIP_DOMAINS = frozenset(
         "github.com",
         "youtube.com",
         "reddit.com",
+        "substack.com",
     ]
 )
 
@@ -52,11 +53,33 @@ _STRIP_TAGS = ["script", "style", "nav", "footer", "aside", "header"]
 _TITLE_SUFFIX_RE = re.compile(r"\s*[|\-–—]\s+.+$")
 
 
+def _is_skippable(url: str) -> bool:
+    """Return True if the URL should be skipped (non-article, tracking, etc.)."""
+    try:
+        parsed = urlparse(url)
+    except ValueError:
+        return True
+
+    if parsed.scheme not in ("http", "https"):
+        return True
+    if not parsed.netloc:
+        return True
+
+    hostname = parsed.netloc.lower().removeprefix("www.")
+    if hostname in _SKIP_DOMAINS:
+        return True
+
+    lower = url.lower()
+    return any(re.search(pattern, lower) for pattern in _SKIP_PATTERNS)
+
+
 def filter_links(urls: list[str]) -> list[str]:
     """Return only URLs that look like fetchable article pages.
 
-    Drops mailto:, anchor-only, known skip domains, social share links,
-    tracking redirects, and unsubscribe patterns.
+    Resolves newsletter redirect URLs (e.g. Substack) to their real
+    destinations first, then drops mailto:, anchor-only, known skip
+    domains, social share links, tracking redirects, and unsubscribe
+    patterns. Unresolvable redirect URLs are dropped.
     """
     filtered: list[str] = []
 
@@ -69,32 +92,14 @@ def filter_links(urls: list[str]) -> list[str]:
         if url.startswith("#") or url.startswith("mailto:"):
             continue
 
-        try:
-            parsed = urlparse(url)
-        except ValueError:
-            logger.debug("filter_links: skipping malformed URL: %s", url)
+        # Resolve newsletter redirects to real destination URLs
+        resolved = _resolve_redirect(url)
+
+        if _is_skippable(resolved):
+            logger.debug("filter_links: skipping %s", resolved[:100])
             continue
 
-        if parsed.scheme not in ("http", "https"):
-            continue
-
-        # Anchor-only (no path beyond #)
-        if not parsed.netloc:
-            continue
-
-        # Skip known non-article domains
-        hostname = parsed.netloc.lower().removeprefix("www.")
-        if hostname in _SKIP_DOMAINS:
-            logger.debug("filter_links: skipping known domain %s", hostname)
-            continue
-
-        # Skip pattern matches
-        lower = url.lower()
-        if any(re.search(pattern, lower) for pattern in _SKIP_PATTERNS):
-            logger.debug("filter_links: skipping pattern-matched URL: %s", url)
-            continue
-
-        filtered.append(url)
+        filtered.append(resolved)
 
     return filtered
 
@@ -228,8 +233,7 @@ def fetch_articles(emails: list[Email]) -> list[ArticleContent]:
     articles: list[ArticleContent] = []
     headers = {"User-Agent": _USER_AGENT}
 
-    for raw_url, email_index in candidates:
-        url = _resolve_redirect(raw_url)
+    for url, email_index in candidates:
         try:
             response = httpx.get(
                 url,
