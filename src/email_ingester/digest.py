@@ -14,15 +14,31 @@ from email_ingester.models import ArticleContent, DigestOutput, DigestReport, Em
 _TEMPLATE_DIR = Path(__file__).parent / "templates"
 
 
-def _build_article_url_map(articles: list[ArticleContent]) -> dict[int, str]:
-    """Build a mapping of email_index -> best article URL.
+def _build_url_map(
+    source_emails: list[Email],
+    articles: list[ArticleContent] | None = None,
+) -> dict[int, str]:
+    """Build a mapping of email_index (1-based) -> best URL for linking.
 
-    When an email has multiple articles, use the first one (highest relevance).
+    Priority: fetched article URL > first link from the original email.
+    This ensures every referenced email gets a hyperlink even when the
+    article fetcher couldn't reach the content.
     """
     url_map: dict[int, str] = {}
-    for article in articles:
-        if article.email_index not in url_map:
-            url_map[article.email_index] = article.url
+
+    # Fallback: first link from each email
+    for idx, email in enumerate(source_emails, start=1):
+        if email.links:
+            url_map[idx] = email.links[0]
+
+    # Override with fetched article URLs (higher quality)
+    if articles:
+        seen: set[int] = set()
+        for article in articles:
+            if article.email_index not in seen:
+                seen.add(article.email_index)
+                url_map[article.email_index] = article.url
+
     return url_map
 
 
@@ -83,7 +99,7 @@ def generate_digest(
     articles: list[ArticleContent] | None = None,
 ) -> DigestOutput:
     """Render the report into an HTML digest."""
-    article_urls = _build_article_url_map(articles) if articles else {}
+    article_urls = _build_url_map(source_emails, articles)
 
     citations = []
     for idx in report.source_indices:
