@@ -9,6 +9,7 @@ from pathlib import Path
 from jinja2 import Environment, FileSystemLoader
 from markupsafe import Markup, escape
 
+from email_ingester.article_fetcher import filter_links
 from email_ingester.models import ArticleContent, DigestOutput, DigestReport, Email
 
 _TEMPLATE_DIR = Path(__file__).parent / "templates"
@@ -26,10 +27,11 @@ def _build_url_map(
     """
     url_map: dict[int, str] = {}
 
-    # Fallback: first link from each email
+    # Fallback: first usable link from each email (unwrapped + filtered)
     for idx, email in enumerate(source_emails, start=1):
-        if email.links:
-            url_map[idx] = email.links[0]
+        resolved = filter_links(email.links)
+        if resolved:
+            url_map[idx] = resolved[0]
 
     # Override with fetched article URLs (higher quality)
     if articles:

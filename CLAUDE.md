@@ -43,6 +43,12 @@ Email:
   body_html: str             # Original HTML
   links: list[str]           # Extracted URLs
 
+ArticleContent:
+  url: str                   # Final resolved article URL (after redirects)
+  title: str                 # From <title> or <h1>
+  text: str                  # Clean article text, max 500 chars
+  email_index: int           # Which input email (1-based) this came from
+
 DigestReport:
   strategic_intel: str       # CEO-framed section (bullet points)
   engineering: str           # CTO-framed section
@@ -68,11 +74,12 @@ Each run executes exactly these steps:
 2. Authenticate to Microsoft Graph (client credentials)
 3. Fetch all unread emails from target folder (`isRead eq false`)
 4. Normalize content (HTML to text, extract links)
-5. Send all emails to LLM in one call, get aggregated report back
-6. Render HTML digest with executive-framed sections and MLA citations
-7. Send digest email via Graph API
-8. Mark all processed emails as read
-9. Exit cleanly
+5. Fetch article content from links (see Link Resolution Pipeline below)
+6. Send all emails + article content to LLM in one call, get aggregated report
+7. Render HTML digest with hyperlinked footnotes and MLA citations
+8. Send digest email via Graph API
+9. Mark all processed emails as read
+10. Exit cleanly
 
 ---
 
@@ -87,7 +94,8 @@ Each run executes exactly these steps:
 
 LLM outputs bullet points with **bold key terms** and [n] source refs.
 Template renders as proper `<ul>` lists with 16px body text.
-Works Cited section uses MLA-style citations in a collapsible dropdown.
+Source refs `[n]` are hyperlinked to the fetched article or best available URL.
+Works Cited section uses MLA-style citations with hyperlinked titles in a collapsible dropdown.
 
 ---
 
@@ -140,9 +148,40 @@ Run all: `./scripts/quality-gate.sh all`
 
 ---
 
-## Next Up: Article Fetcher
+## Link Resolution Pipeline
 
-Planned feature to enrich the LLM context by following links from emails
-and fetching actual article content (not just newsletter summaries).
+Newsletter emails wrap article links in tracking redirects and platform-specific
+redirectors. The `article_fetcher` module resolves these to real article URLs
+through a multi-step pipeline before fetching content.
 
-See `.gorp/plans/current-sprint.md` for the implementation plan.
+### Resolution chain (applied in order)
+
+1. **Unwrap tracking URLs** — extract embedded destination from wrappers like
+   `tracking.tldrnewsletter.com/CL0/https:%2F%2Fexample.com%2Farticle/1/...`
+2. **Resolve Substack redirects** — decode JWT payload from
+   `substack.com/redirect/2/<jwt>` to extract the `"e"` (destination) field
+3. **Filter** — drop non-article URLs:
+   - Skip domains: github.com, youtube.com, reddit.com, substack.com, tldr.tech
+   - Skip patterns: unsubscribe, social share, tracking redirects, ads, web-version
+4. **Normalize for dedup** — strip query params to canonical `scheme://host/path`
+5. **Distribute slots** — round-robin across emails (max 10 total) so one
+   link-heavy newsletter doesn't consume all slots
+6. **Fetch** — httpx GET with 10s timeout, follow HTTP redirects, store final URL
+7. **Paywall detection** — skip 402/403 and pages containing paywall phrases
+8. **Extract** — title from `<title>`/`<h1>`, body text stripped of nav/footer/ads,
+   truncated to 500 chars
+
+### URL fallback for hyperlinks
+
+When building hyperlinked footnotes, the digest renderer uses:
+- **Fetched article URL** (best quality) if available
+- **First resolved link from the email** (run through the same filter_links pipeline)
+  as fallback — ensures links are unwrapped and cleaned, never raw tracking URLs
+
+### Adding support for new newsletter platforms
+
+When a new newsletter platform wraps links in a non-standard way:
+1. Add an unwrap function (like `_unwrap_tracking_url`) in `article_fetcher.py`
+2. Wire it into `filter_links()` before the `_is_skippable` check
+3. Add the platform's domain to `_SKIP_DOMAINS` if its own pages aren't articles
+4. Test with real emails from that platform
