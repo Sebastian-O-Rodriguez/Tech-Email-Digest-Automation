@@ -2,7 +2,7 @@ name: Email Digest
 
 on:
   schedule:
-    # 9:30 AM EDT / 8:30 AM EST (Mon-Fri)
+    # 9:30 AM ET (Mon-Fri) — 13:30 UTC standard, 14:30 UTC during DST
     - cron: '30 13 * * 1-5'
 
   workflow_dispatch: {}

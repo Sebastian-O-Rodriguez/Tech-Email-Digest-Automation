@@ -4,18 +4,19 @@ Automated intelligence brief that reads your Outlook inbox and delivers a concis
 
 ## What it does
 
-Every weekday at 9:30 AM and 12:30 PM ET, this pipeline:
+Once daily, Mon-Fri at 9:30 AM ET, this pipeline:
 
 1. Fetches all **unread** emails from a target Outlook folder
 2. Processes and cleans the content (HTML to text, link extraction)
-3. Sends everything to an LLM in one call to produce an aggregated report
-4. Renders a polished HTML digest with four sections:
-   - **Breaking News** -- urgent developments, security alerts, outages
-   - **Tech Stacks** -- backend, frontend, infrastructure trends
-   - **New Software** -- tools, product launches, dev tooling
-   - **Deep Dives** -- notable long-form content worth reading later
-5. Sends the digest via Outlook
-6. Marks all processed emails as read
+3. Fetches article content from extracted links (unwraps tracking URLs, resolves redirects)
+4. Sends all emails + article content to an LLM in one call to produce an aggregated report
+5. Renders a polished HTML digest with four sections:
+   - **Strategic Intel** -- market shifts, why it matters for AI companies (CEO frame)
+   - **Engineering** -- stack decisions, adopt/avoid signals (CTO frame)
+   - **Tools & Ops** -- workflow improvements, ship-faster tools (COO frame)
+   - **On the Radar** -- notable signals that don't fit above
+6. Sends the digest via Outlook with hyperlinked footnotes and MLA citations
+7. Marks all processed emails as read
 
 No state files. No database. Read/unread on the emails IS the state.
 
@@ -82,18 +83,19 @@ python -m email_ingester
 
 ```
 src/email_ingester/
-  __main__.py      # python -m email_ingester entry point
-  main.py          # Pipeline orchestration
-  config.py        # Environment variable loader
-  models.py        # Data contracts (Email, DigestReport, DigestOutput)
-  auth.py          # Microsoft Graph OAuth2 token acquisition
-  ingester.py      # Fetch unread emails, mark as read
-  processor.py     # HTML normalization, link extraction
-  summarizer.py    # LLM aggregation via OpenRouter
-  digest.py        # Jinja2 rendering, MLA citations
-  sender.py        # Send digest via Graph API
+  __main__.py         # python -m email_ingester entry point
+  main.py             # Pipeline orchestration
+  config.py           # Environment variable loader
+  models.py           # Data contracts (Email, DigestReport, DigestOutput)
+  auth.py             # Microsoft Graph OAuth2 token acquisition
+  ingester.py         # Fetch unread emails, mark as read
+  processor.py        # HTML normalization, link extraction
+  article_fetcher.py  # Link resolution, tracking URL unwrap, article extraction
+  summarizer.py       # LLM aggregation via OpenRouter
+  digest.py           # Jinja2 rendering, hyperlinked footnotes, MLA citations
+  sender.py           # Send digest via Graph API
   templates/
-    digest.html.j2 # HTML email template (Guava AI branded)
+    digest.html.j2    # HTML email template (Guava AI branded)
 ```
 
 ## License
