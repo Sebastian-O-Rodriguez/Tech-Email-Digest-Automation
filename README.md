@@ -177,10 +177,10 @@ See `.env.example` for local development configuration.
 ## Development
 
 ```bash
-python -m venv .venv && source .venv/bin/activate
-pip install '.[dev]'
+python3 -m venv .venv && source .venv/bin/activate
+pip install -e '.[dev]'
 
-# Quality gates
+# Quality gates (quality-gate.sh finds .venv automatically, no activation needed)
 ruff check src/ tests/
 ruff format --check src/ tests/
 python -m pytest
