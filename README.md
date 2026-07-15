@@ -155,7 +155,7 @@ Add these to Settings > Secrets > Actions:
 | `MAILBOX_USER` | Yes | Target mailbox email address |
 | `OPENROUTER_API_KEY` | Yes | OpenRouter API key |
 | `TARGET_FOLDER_NAME` | No | Outlook folder name (default: `Inbox`) |
-| `LLM_MODEL` | No | OpenRouter model ID (default: `anthropic/claude-sonnet-4`) |
+| `LLM_MODEL` | No | OpenRouter model ID (default: `google/gemini-3.5-flash`) |
 
 `DIGEST_RECIPIENT` defaults to `MAILBOX_USER` if not set.
 
@@ -171,7 +171,7 @@ See `.env.example` for local development configuration.
 | `MAILBOX_USER` | Yes | — | Target mailbox email address |
 | `OPENROUTER_API_KEY` | Yes | — | OpenRouter API key |
 | `TARGET_FOLDER_NAME` | No | `Inbox` | Outlook folder display name |
-| `LLM_MODEL` | No | `anthropic/claude-sonnet-4` | OpenRouter model identifier |
+| `LLM_MODEL` | No | `google/gemini-3.5-flash` | OpenRouter model identifier |
 | `DIGEST_RECIPIENT` | No | `MAILBOX_USER` | Digest email recipient |
 
 ## Development
