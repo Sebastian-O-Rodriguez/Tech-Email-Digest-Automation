@@ -44,6 +44,6 @@ class Config:
             mailbox_user_id=mailbox_user_id,
             mailbox_folder=os.environ.get("TARGET_FOLDER_NAME", "Inbox"),
             openrouter_api_key=require("OPENROUTER_API_KEY"),
-            llm_model=os.environ.get("LLM_MODEL", "google/gemini-3.5-flash"),
+            llm_model=os.environ.get("LLM_MODEL", "google/gemini-3.8-flash"),
             digest_recipient=os.environ.get("DIGEST_RECIPIENT", mailbox_user_id),
         )
