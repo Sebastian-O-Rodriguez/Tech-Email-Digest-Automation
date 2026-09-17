@@ -20,9 +20,9 @@ log = logging.getLogger("mark_unread")
 
 GRAPH = "https://graph.microsoft.com/v1.0"
 
-# Only messages marked read by the 2026-09-17 fallback run (~12:55Z), not the
-# full historical read backlog.
-CUTOFF = "2026-09-17T12:50:00Z"
+# The 2026-09-17 fallback run consumed 681 backlogged emails (the most recent
+# read messages in the folder). Flip exactly that many, newest received first.
+LIMIT = 681
 
 
 def get_token() -> str:
@@ -53,26 +53,26 @@ def resolve_folder_id(client: httpx.Client, mailbox: str, name: str) -> str:
     return value[0]["id"]
 
 
-def collect_read_ids(client: httpx.Client, folder_id: str, since: str) -> list[str]:
-    """Read messages modified (e.g. marked read) at/after `since`."""
+def collect_read_ids(client: httpx.Client, folder_id: str, limit: int) -> list[str]:
+    """The `limit` most recent read messages, newest received first."""
     ids: list[str] = []
     url: str | None = (
         f"{GRAPH}/users/{os.environ['MAILBOX_USER']}/mailFolders/{folder_id}/messages"
     )
     params = {
-        "$filter": f"isRead eq true and lastModifiedDateTime ge {since}",
-        "$select": "id",
+        "$filter": "isRead eq true",
+        "$select": "id,receivedDateTime",
         "$top": "200",
-        "$orderby": "lastModifiedDateTime desc",
+        "$orderby": "receivedDateTime desc",
     }
-    while url:
+    while url and len(ids) < limit:
         resp = client.get(url, params=params)
         resp.raise_for_status()
         data = resp.json()
         ids.extend(m["id"] for m in data.get("value", []))
         url = data.get("@odata.nextLink")
         params = None  # nextLink already carries the paging params
-    return ids
+    return ids[:limit]
 
 
 def mark_unread(client: httpx.Client, mailbox: str, message_id: str) -> bool:
@@ -101,8 +101,8 @@ def main() -> None:
         headers={"Authorization": f"Bearer {token}"}, timeout=60
     ) as client:
         folder_id = resolve_folder_id(client, mailbox, folder_name)
-        ids = collect_read_ids(client, folder_id, CUTOFF)
-        log.info("Found %d message(s) to flip in folder %r", len(ids), folder_name)
+        ids = collect_read_ids(client, folder_id, LIMIT)
+        log.info("Flipping %d most recent read message(s) in folder %r", len(ids), folder_name)
 
         def work(mid: str) -> bool:
             return mark_unread(client, mailbox, mid)
