@@ -1,0 +1,38 @@
+name: Admin Mark Unread
+
+on:
+  workflow_dispatch: {}
+
+concurrency:
+  group: admin-mark-unread
+
+permissions:
+  contents: read
+
+env:
+  PYTHON_VERSION: '3.12'
+
+jobs:
+  mark-unread:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: pip install httpx
+
+      - name: Mark all messages unread
+        env:
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          MAILBOX_USER: ${{ secrets.MAILBOX_USER }}
+          TARGET_FOLDER_NAME: ${{ secrets.TARGET_FOLDER_NAME }}
+        run: python scripts/mark_unread.py
