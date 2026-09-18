@@ -29,7 +29,7 @@ Runs as a scheduled GitHub Actions job. No server, no database, no UI. Mailbox r
 **Pipeline steps:**
 
 1. Authenticate to Microsoft Graph via OAuth2 client credentials flow
-2. Fetch all unread emails from target folder (`isRead eq false`)
+2. Fetch up to 50 most recent unread emails from target folder (`isRead eq false`, capped by `MAX_FETCH` in `ingester.py`)
 3. Normalize HTML to plain text, extract HTTP links
 4. Resolve tracking redirects, unwrap URLs, fetch article content (max 10)
 5. Send all content to LLM in a single aggregation call
@@ -107,7 +107,7 @@ src/email_ingester/
   config.py           Environment variable loader (frozen dataclass)
   models.py           Data contracts: Email, ArticleContent, DigestReport, DigestOutput
   auth.py             Microsoft Graph OAuth2 client credentials token acquisition
-  ingester.py         Fetch unread emails, resolve folders, mark as read, 429 handling
+  ingester.py         Fetch unread emails (capped at 50/run), resolve folders, mark as read, 429 handling
   processor.py        HTML-to-text normalization, HTTP link extraction
   article_fetcher.py  Tracking URL unwrap, Substack JWT decode, article fetch, paywall detection
   summarizer.py       Single-call LLM aggregation via OpenRouter, JSON parse with fallback
@@ -121,7 +121,7 @@ tests/
   test_processor.py         16 tests — HTML normalization, link extraction
   test_auth.py              10 tests — token acquisition, error scenarios
   test_sender.py             8 tests — sendMail, error handling
-  test_ingester.py           6 tests — email fetch, folder resolution, 429 handling
+  test_ingester.py           8 tests — email fetch, folder resolution, 50-cap, 429 handling
   test_summarizer.py         6 tests — LLM response parsing, JSON fallback
   test_digest.py             5 tests — rendering, citations, hyperlinks
   test_main.py               3 tests — end-to-end pipeline integration
@@ -173,6 +173,24 @@ See `.env.example` for local development configuration.
 | `TARGET_FOLDER_NAME` | No | `Inbox` | Outlook folder display name |
 | `LLM_MODEL` | No | `deepseek/deepseek-v4-flash` | OpenRouter model identifier |
 | `DIGEST_RECIPIENT` | No | `MAILBOX_USER` | Digest email recipient |
+
+## Operations
+
+### Admin Mark Unread (one-off workflow)
+
+`.github/workflows/admin-mark-unread.yml` is a `workflow_dispatch`-only workflow that
+runs `scripts/mark_unread.py`: it flips the `LIMIT` (default 681) most recent read
+messages in the target folder back to unread. No schedule; use only to restore
+mailbox state after a bad run.
+
+### Incident log
+
+| Date | Incident | Resolution |
+|------|----------|------------|
+| 2026-07 → 2026-09-17 | Daily failures: Azure app registration deleted (`AADSTS700016`); GitHub auto-disabled workflow (`disabled_inactivity`) | App recreated, secrets refreshed, workflow re-enabled |
+| 2026-09-17 | Fallback digest: `max_tokens=1024` too small for reasoning models — JSON truncated | Raised to `16384`; default model now `deepseek/deepseek-v4-flash` |
+| 2026-09-17/18 | 1,730-email double-digest: failed admin unread-flip left 1,049 historical emails unread | Reverted via count-based unread flip; backlog re-consumed |
+| 2026-09-18 | Ingest cap added: max 50 unread emails per run | `MAX_FETCH = 50` in `ingester.py`; older unread stays unread |
 
 ## Development
 
