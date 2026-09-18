@@ -144,3 +144,77 @@ class TestFetchUnreadSuccess:
         assert len(result) == 1
         assert result[0].id == "msg-1"
         assert result[0].subject == "Test"
+
+
+class TestFetchCap:
+    def test_caps_at_max_fetch_and_requests_top_50(self, config, monkeypatch):
+        import email_ingester.ingester as mod
+
+        folder_resp = _mock_get_response(200, {"value": [{"id": "fid", "displayName": "Inbox"}]})
+        # Server returns 200 messages in one page (ignores $top for the mock).
+        messages = [
+            {
+                "id": f"msg-{i}",
+                "subject": f"S{i}",
+                "from": {"emailAddress": {"address": "a@b.com"}},
+                "receivedDateTime": f"2026-03-25T10:{i // 60:02d}:{i % 60:02d}Z",
+                "body": {"contentType": "html", "content": "<p>hi</p>"},
+            }
+            for i in range(200)
+        ]
+        msg_resp = _mock_get_response(200, {"value": messages})
+
+        seen_urls = []
+
+        def mock_get(url, **kwargs):
+            seen_urls.append(url)
+            return folder_resp if not seen_urls[1:] else msg_resp
+
+        monkeypatch.setattr(mod.httpx, "get", mock_get)
+
+        result = fetch_unread_emails(config, "token")
+
+        assert len(result) == mod.MAX_FETCH
+        assert result[0].id == "msg-0"  # newest first (mock order)
+        # Single message request, paginated at the cap.
+        message_urls = [u for u in seen_urls if "/messages" in u]
+        assert len(message_urls) == 1
+        assert "$top=50" in message_urls[0]
+
+    def test_stops_after_cap_despite_next_link(self, config, monkeypatch):
+        import email_ingester.ingester as mod
+
+        folder_resp = _mock_get_response(200, {"value": [{"id": "fid", "displayName": "Inbox"}]})
+
+        def _page(n):
+            return _mock_get_response(
+                200,
+                {
+                    "value": [
+                        {
+                            "id": f"msg-{n}-{i}",
+                            "subject": "S",
+                            "from": {"emailAddress": {"address": "a@b.com"}},
+                            "receivedDateTime": "2026-03-25T10:00:00Z",
+                            "body": {"contentType": "html", "content": "<p>hi</p>"},
+                        }
+                        for i in range(30)
+                    ]
+                }
+                | ({"@odata.nextLink": f"https://graph.microsoft.com/page{ n + 1 }"} if n < 10 else {}),
+            )
+
+        page_count = 0
+
+        def mock_get(url, **kwargs):
+            nonlocal page_count
+            page_count += 1
+            return folder_resp if page_count == 1 else _page(page_count - 2)
+
+        monkeypatch.setattr(mod.httpx, "get", mock_get)
+
+        result = fetch_unread_emails(config, "token")
+
+        assert len(result) == mod.MAX_FETCH
+        # 50 / 30 per page = 2 message pages fetched, third never requested.
+        assert page_count == 3

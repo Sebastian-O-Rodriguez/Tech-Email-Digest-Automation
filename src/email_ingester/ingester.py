@@ -10,6 +10,10 @@ import httpx
 
 from email_ingester.models import Email
 
+# Maximum unread emails ingested per run. Anything beyond this stays unread
+# and is picked up on later runs.
+MAX_FETCH = 50
+
 if TYPE_CHECKING:
     from email_ingester.config import Config
 
@@ -139,10 +143,12 @@ def _parse_email(msg: dict) -> Email | None:
 
 
 def fetch_unread_emails(config: Config, token: str) -> list[Email]:
-    """Fetch all unread emails from the target folder.
+    """Fetch the most recent unread emails from the target folder.
 
-    Uses isRead eq false filter. After processing, the pipeline marks
-    them as read, so the next run only picks up new arrivals.
+    Uses isRead eq false filter, newest first, capped at MAX_FETCH. Emails
+    beyond the cap stay unread and are picked up on later runs. After
+    processing, the pipeline marks fetched emails as read, so the next run
+    only picks up new arrivals.
     """
     headers = {"Authorization": f"Bearer {token}"}
     folder_id = _resolve_folder_id(config.mailbox_user_id, config.mailbox_folder, headers)
@@ -152,14 +158,14 @@ def fetch_unread_emails(config: Config, token: str) -> list[Email]:
         f"/mailFolders/{folder_id}/messages"
         f"?$filter=isRead eq false"
         f"&$select=id,subject,from,receivedDateTime,body"
-        f"&$top=200"
+        f"&$top={MAX_FETCH}"
         f"&$orderby=receivedDateTime desc"
     )
 
     emails: list[Email] = []
     page_number = 0
 
-    while url:
+    while url and len(emails) < MAX_FETCH:
         page_number += 1
         logger.info("Fetching unread page %d...", page_number)
 
@@ -172,6 +178,8 @@ def fetch_unread_emails(config: Config, token: str) -> list[Email]:
         logger.info("Page %d: %d unread message(s).", page_number, len(messages))
 
         for msg in messages:
+            if len(emails) >= MAX_FETCH:
+                break
             parsed = _parse_email(msg)
             if parsed is not None:
                 emails.append(parsed)
@@ -180,6 +188,7 @@ def fetch_unread_emails(config: Config, token: str) -> list[Email]:
 
     logger.info("Fetch complete: %d unread email(s).", len(emails))
     return emails
+
 
 
 def mark_as_read(config: Config, token: str, emails: list[Email]) -> None:
