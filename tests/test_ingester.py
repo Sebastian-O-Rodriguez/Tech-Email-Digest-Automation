@@ -201,7 +201,11 @@ class TestFetchCap:
                         for i in range(30)
                     ]
                 }
-                | ({"@odata.nextLink": f"https://graph.microsoft.com/page{ n + 1 }"} if n < 10 else {}),
+                | (
+                    {"@odata.nextLink": f"https://graph.microsoft.com/page{n + 1}"}
+                    if n < 10
+                    else {}
+                ),
             )
 
         page_count = 0
