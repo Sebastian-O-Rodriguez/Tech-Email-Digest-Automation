@@ -159,7 +159,19 @@ Add these to Settings > Secrets > Actions:
 
 `DIGEST_RECIPIENT` defaults to `MAILBOX_USER` if not set.
 
-See `.env.example` for local development configuration.
+### Local Development (env standard)
+
+`.env.example` is the names contract; values live in `.env` (gitignored,
+operator-owned — never committed). Wire it up with [direnv](https://direnv.net):
+
+```bash
+cp .env.example .env   # then fill in your values
+direnv allow
+```
+
+direnv exports the variables whenever you enter the repo — Python runs need no
+manual sourcing. Keep `.env` values in sync with the GitHub Secrets above (CI
+reads the secrets, local runs read `.env`).
 
 ## Environment Variables
 
@@ -191,6 +203,8 @@ mailbox state after a bad run.
 | 2026-09-17 | Fallback digest: `max_tokens=1024` too small for reasoning models — JSON truncated | Raised to `16384`; default model now `deepseek/deepseek-v4-flash` |
 | 2026-09-17/18 | 1,730-email double-digest: failed admin unread-flip left 1,049 historical emails unread | Reverted via count-based unread flip; backlog re-consumed |
 | 2026-09-18 | Ingest cap added: max 50 unread emails per run | `MAX_FETCH = 50` in `ingester.py`; older unread stays unread |
+| 2026-10-14 | Expired `OPENROUTER_API_KEY` produced a green run with an `api_error` fallback digest (silent failure) | Key rotated; secret refreshed |
+| 2026-10-14 | Stale `AZURE_CLIENT_SECRET` (rotated app-side): `AADSTS7000215` auth failure | Secret refreshed from operator `.env`; repo migrated to the direnv env standard (`.envrc`) |
 
 ## Development
 
