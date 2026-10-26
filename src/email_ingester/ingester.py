@@ -190,7 +190,6 @@ def fetch_unread_emails(config: Config, token: str) -> list[Email]:
     return emails
 
 
-
 def mark_as_read(config: Config, token: str, emails: list[Email]) -> None:
     """Mark emails as read via Graph API PATCH. Best-effort, never raises."""
     headers = {
